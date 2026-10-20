@@ -38,11 +38,12 @@ async function exportCR(v) {
   toast('Préparation du PDF…'); const ctx = pdfDoc(`CR n° ${v.numero} du ${fmtD(v.date)}`), { doc, M, W } = ctx;
   pdfHeader(ctx, `Compte-rendu de chantier n° ${v.numero}`, [`Visite du ${fmtDL(v.date)}${v.heure ? ' à ' + v.heure.replace(':', ' h ') : ''}${v.meteo ? ' · météo : ' + v.meteo : ''}`, v.redacteur && 'Rédigé par ' + v.redacteur]);
   // présences
-  const ents = S.ch.entreprises || [];
+  const ents = intervenants().filter(e => e.convoque !== false || (v.presents || {})[e.id]);
   if (ents.length) { ctx.text('Présences', { size: 11.5, bold: true, gap: 1.5 }); const cols = [M, M + 62, M + 104, M + 158];
-    doc.setFontSize(8); doc.setTextColor(110); doc.setFont('helvetica', 'bold'); ['Entreprise', 'Lots', 'Contact', 'Présence'].forEach((t, i) => doc.text(t, cols[i], ctx.y + 3)); ctx.y += 5;
+    doc.setFontSize(8); doc.setTextColor(110); doc.setFont('helvetica', 'bold'); ['Organisme', 'Rôle', 'Interlocuteur', 'Présence'].forEach((t, i) => doc.text(t, cols[i], ctx.y + 3)); ctx.y += 5;
     for (const e of ents) { ctx.need(6); const st = { P: 'Présent', A: 'Absent', E: 'Excusé' }[(v.presents || {})[e.id]] || '-'; doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30);
-      doc.text(doc.splitTextToSize(pdfTxt(e.nom), 58)[0], cols[0], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt(lotsOf().filter(l => l.entrepriseId === e.id).map(l => l.code).join(', ')), 40)[0] || '', cols[1], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt(e.contact || ''), 52)[0] || '', cols[2], ctx.y + 3.5);
+      const lots = e.role === 'ENT' ? lotsOf().filter(l => l.entrepriseId === e.id).map(l => l.code).join(', ') : '';
+      doc.text(doc.splitTextToSize(pdfTxt(e.nom), 58)[0] || '', cols[0], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt(e.role === 'ENT' ? (lots ? 'Lot ' + lots : 'Entreprise') : e.role), 40)[0] || '', cols[1], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt([e.contact, e.fonction].filter(Boolean).join(', ')), 52)[0] || '', cols[2], ctx.y + 3.5);
       doc.setTextColor(...(st === 'Présent' ? [47, 143, 91] : st === 'Absent' ? [194, 65, 12] : [110, 110, 110])); doc.text(st, cols[3], ctx.y + 3.5); ctx.y += 5.2; doc.setDrawColor(230); doc.line(M, ctx.y, W - M, ctx.y); }
     ctx.y += 3; }
   if (v.autres) ctx.text('Autres participants : ' + v.autres, { size: 9.5, gap: 3 });
@@ -65,7 +66,7 @@ async function exportCR(v) {
       ctx.y += 1.5;
     }
   }
-  ctx.rule(); if (v.prochaine) ctx.text('Prochaine réunion : ' + v.prochaine, { size: 10, bold: true, gap: 2 }); if (v.diffusion) ctx.text('Diffusion : ' + v.diffusion, { size: 9, color: [90, 90, 90] });
+  ctx.rule(); if (v.prochaine) ctx.text('Prochaine réunion : ' + v.prochaine, { size: 10, bold: true, gap: 2 }); const dest = intervenants().filter(e => e.convoque !== false).map(e => e.nom + (e.contact ? ' (' + e.contact + ')' : '')); if (dest.length || v.diffusion) ctx.text('Diffusion : ' + [dest.join(', '), v.diffusion].filter(Boolean).join(' ; '), { size: 9, color: [90, 90, 90] });
   ctx.finish(`${S.ch.code || S.ch.nom} - CR ${String(v.numero).padStart(2, '0')} du ${v.date}`);
   v.diffuseLe = v.diffuseLe || today(); await save('visites', v);
 }

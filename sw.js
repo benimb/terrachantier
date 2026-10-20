@@ -1,6 +1,6 @@
 /* TerraChantier : fonctionnement hors réseau.
    L'application (pages, scripts, bibliothèques) est mise en cache à l'installation ; les données restent dans la base du navigateur (IndexedDB). */
-const VERSION = 'tc-0.1.1';
+const VERSION = 'tc-0.2';
 const SHELL = ['./', 'index.html', 'app.js', 'db.js', 'plan.js', 'export.js', 'sync.js', 'manifest.webmanifest',
   'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/jspdf.umd.min.js', 'vendor/xlsx.full.min.js', 'vendor/supabase.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
