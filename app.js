@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.1';
+const APP_VERSION = '0.1.1';
 const $ = (q, el = document) => el.querySelector(q), $$ = (q, el = document) => [...el.querySelectorAll(q)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
@@ -327,12 +327,14 @@ function placeOnPlan(planId, pt, title) {
 /* ---------- Plans ---------- */
 async function tabPlans(m) {
   const urls = await Promise.all(S.plans.map(p => BlobURL(p.thumbId)));
-  m.innerHTML = `<div class="bar"><h2 class="grow" style="font-size:18px">Plans de niveaux</h2><button class="btn pri" id="bPdf">+ Importer un plan (PDF ou image)</button></div>
+  m.innerHTML = `<div class="bar"><h2 class="grow" style="font-size:18px">Plans de niveaux</h2><button class="btn pri" id="bPdf">+ Plan PDF</button><button class="btn" id="bPImg">+ Plan en image</button></div>
     <div class="hint" style="margin-bottom:10px">Un PDF de plusieurs pages donne un niveau par page. Nommez chaque niveau (Sous-sol, RDC, R+1…) ; les photos et les réserves s'y placent d'un toucher.</div>
     <div id="pdfProg"></div>
     <div class="list">${S.plans.map((p, i) => `<div class="card row"><img src="${urls[i]}" alt="" style="width:86px;height:64px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px;cursor:pointer" data-open="${p.id}"><div class="grow"><input type="text" value="${esc(p.nom)}" data-ren="${p.id}" aria-label="Nom du niveau"><div class="small muted" style="margin-top:3px">${S.photos.filter(x => x.planId === p.id).length} photo(s) · ${S.reserves.filter(x => x.planId === p.id).length} réserve(s)${p.source ? ' · ' + esc(p.source) : ''}</div></div>
       <div style="display:flex;flex-direction:column;gap:4px"><button class="btn sm" data-up="${i}" ${i ? '' : 'disabled'} aria-label="Monter">↑</button><button class="btn sm danger" data-del="${p.id}" aria-label="Supprimer">×</button></div></div>`).join('') || '<div class="empty"><b>Aucun plan</b>Importez les plans de niveaux du dossier (PDF).</div>'}</div>`;
+  // deux boutons : sur Android, un sélecteur qui accepte aussi les images ouvre la galerie de photos, où les PDF n'apparaissent pas
   $('#bPdf').onclick = () => { const inp = $('#pdfIn'); inp.value = ''; inp.onchange = () => inp.files[0] && importPlan(inp.files[0], m); inp.click(); };
+  $('#bPImg').onclick = () => { const inp = $('#planImgIn'); inp.value = ''; inp.onchange = () => inp.files[0] && importPlan(inp.files[0], m); inp.click(); };
   $$('[data-ren]', m).forEach(i => i.onchange = async () => { const p = planById(i.dataset.ren); p.nom = i.value.trim() || p.nom; await save('plans', p); });
   $$('[data-open]', m).forEach(b => b.onclick = () => planSheet(planById(b.dataset.open)));
   $$('[data-up]', m).forEach(b => b.onclick = async () => { const i = +b.dataset.up, a = S.plans[i - 1], c = S.plans[i]; [a.ordre, c.ordre] = [i, i - 1]; await save('plans', a); await save('plans', c); S.plans.sort((x, y) => x.ordre - y.ordre); tabPlans(m); });
@@ -407,6 +409,10 @@ async function backupImport(file) {
 (async function init() {
   S.auteur = (await DB.meta('auteur')) || ''; S.lastPlan = await DB.meta('lastPlan');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    const had = !!navigator.serviceWorker.controller; let done = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !done) { done = true; location.reload(); } }); // nouvelle version installée : rechargement
+    navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(e => console.warn('SW', e));
+  }
   await render(); Sync.start();
 })();
