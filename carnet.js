@@ -47,24 +47,24 @@ const Carnet = (() => {
 
   /* ---------- fiche : formulaire ---------- */
   function personHTML(p, i, isAg) {
-    return `<div class="card pers" data-p="${i}"><div class="grid2"><label class="f">Civilité<select data-pf="civ">${['', 'M.', 'Mme'].map(v => `<option${(p.civ || '') === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+    return `<div class="card pers" data-p="${i}"><div class="small" style="font-weight:700;color:var(--accent);margin-bottom:6px">Interlocuteur ${i + 1}${p.prenom || p.nom ? ' : ' + esc([p.prenom, p.nom].filter(Boolean).join(' ')) : ''}</div><div class="grid2"><label class="f">Civilité<select data-pf="civ">${['', 'M.', 'Mme'].map(v => `<option${(p.civ || '') === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="f">Prénom<input type="text" data-pf="prenom" value="${esc(p.prenom)}"></label><label class="f">Nom<input type="text" data-pf="nom" value="${esc(p.nom)}"></label>
-      <label class="f">Fonction<input type="text" data-pf="fonction" value="${esc(p.fonction)}" placeholder="${isAg ? 'Architecte, chef de projet…' : 'Conducteur de travaux, chef de projet…'}"></label>
+      <label class="f">Fonction de la personne<input type="text" data-pf="fonction" value="${esc(p.fonction)}" placeholder="${isAg ? 'Architecte, chef de projet…' : 'Conducteur de travaux, chef de projet…'}"></label>
       <label class="f">Mobile<input type="tel" data-pf="mobile" value="${esc(p.mobile)}"></label><label class="f">Téléphone fixe<input type="tel" data-pf="tel" value="${esc(p.tel)}"></label>
       <label class="f">E-mail<input type="email" data-pf="email" value="${esc(p.email)}"></label></div>
       <div class="row" style="margin-top:6px"><label class="row small muted" style="gap:5px"><input type="radio" name="princ" data-pf="principal"${p.principal ? ' checked' : ''}> ${isAg ? 'Architecte par défaut (émetteur des CR et des photos)' : 'Interlocuteur principal'}</label><span class="grow"></span><button type="button" class="btn sm danger" data-prm>Retirer</button></div></div>`;
   }
   function formHTML(c, { isAg } = {}) {
-    return `<div class="grid2">${isAg ? '' : `<label class="f">Rôle<select data-cf="role">${ROLES.map(([k, t]) => `<option value="${k}"${c.role === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`}
+    return `<h3 class="fsec">${isAg ? 'Agence' : 'Société ou organisme'}</h3><div class="grid2">${isAg ? '' : `<label class="f">Rôle<select data-cf="role">${ROLES.map(([k, t]) => `<option value="${k}"${c.role === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`}
       <label class="f">${isAg ? "Nom de l'agence" : 'Société ou organisme'}<input type="text" data-cf="nom" value="${esc(c.nom)}"></label>
       <label class="f">Adresse<input type="text" data-cf="adresse" value="${esc(c.adresse)}"></label><label class="f">Code postal<input type="text" data-cf="cp" value="${esc(c.cp)}" inputmode="numeric"></label>
-      <label class="f">Ville<input type="text" data-cf="ville" value="${esc(c.ville)}"></label><label class="f">Téléphone<input type="tel" data-cf="tel" value="${esc(c.tel)}"></label>
-      <label class="f">E-mail<input type="email" data-cf="email" value="${esc(c.email)}"></label><label class="f">Site<input type="url" data-cf="site" value="${esc(c.site)}" placeholder="https://"></label>
+      <label class="f">Ville<input type="text" data-cf="ville" value="${esc(c.ville)}"></label><label class="f">Téléphone (standard)<input type="tel" data-cf="tel" value="${esc(c.tel)}"></label>
+      <label class="f">E-mail (général)<input type="email" data-cf="email" value="${esc(c.email)}"></label><label class="f">Site<input type="url" data-cf="site" value="${esc(c.site)}" placeholder="https://"></label>
       <label class="f">SIRET<input type="text" data-cf="siret" value="${esc(c.siret)}"></label>
       ${isAg ? `<label class="f">Inscription à l'Ordre (n°, région)<input type="text" data-cf="ordre" value="${esc(c.ordre)}"></label>` : `<label class="f">Lots ou corps d'état habituels<input type="text" data-cf="lots" value="${esc(lotsTxt(c))}" placeholder="02, 07"></label>`}</div>
       ${isAg ? `<div class="row" style="flex-wrap:wrap"><span class="small muted grow">Logo (en-tête des comptes-rendus et des listes de réserves)</span><img id="agLogo" alt="" style="max-height:44px;max-width:160px;display:${c.logoId ? 'block' : 'none'}"><button type="button" class="btn sm" id="agLogoB">${c.logoId ? 'Changer' : 'Ajouter un logo'}</button>${c.logoId ? '<button type="button" class="btn sm danger" id="agLogoX">Retirer</button>' : ''}</div>` : ''}
       <label class="f">Notes<textarea data-cf="notes" rows="2">${esc(c.notes)}</textarea></label>
-      <div class="bar" style="margin:8px 0 0"><h3 class="grow" style="font-size:15px">${isAg ? 'Architectes et collaborateurs' : 'Interlocuteurs'}</h3><button type="button" class="btn sm" id="pAdd">+ Interlocuteur</button></div>
+      <div class="bar" style="margin:8px 0 0"><h3 class="grow fsec" style="margin:0">${isAg ? 'Architectes et collaborateurs' : 'Interlocuteurs (personnes)'}</h3><button type="button" class="btn sm" id="pAdd">+ Interlocuteur</button></div>
       <div class="list" id="pList">${c.personnes.map((p, i) => personHTML(p, i, isAg)).join('')}</div>`;
   }
   /* relie le formulaire à la fiche ; collect() recopie les champs dans la fiche */
