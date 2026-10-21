@@ -20,18 +20,18 @@ window.addEventListener('hashchange', render);
 async function viewList(m) {
   const all = Carnet.sorted(), chs = await DB.all('chantiers'), unlinked = chs.reduce((n, c) => n + (c.entreprises || []).filter(e => e.nom && !(e.contactId && Carnet.byId(e.contactId))).length, 0);
   const uses = id => chs.filter(c => (c.entreprises || []).some(e => e.contactId === id)).map(c => c.code || c.nom);
-  const roleOf = c => c.agence ? 'MOE' : c.role, counts = ROLES.map(([k]) => [k, all.filter(c => roleOf(c) === k).length]).filter(x => x[1]);
+  const roleOf = c => c.agence ? 'MOE' : c.role, catOf = c => roleCat(roleOf(c)), counts = ROLE_CATS.map(([k]) => [k, all.filter(c => catOf(c) === k).length]).filter(x => x[1]);
   m.innerHTML = `${!Carnet.agence() ? `<div class="install"><div class="grow"><b>Commencez par votre agence</b><div class="small muted">Nom, coordonnées, logo, architectes : l'architecte par défaut signe les comptes-rendus et les photos des chantiers.</div></div><a class="btn pri" href="#/agence">Mon agence</a></div>` : ''}
     ${unlinked ? `<div class="install"><div class="grow"><b>${unlinked} intervenant(s) saisi(s) dans les chantiers hors du carnet</b><div class="small muted">Les reprendre crée leurs fiches (sans doublon de nom) et les relie aux chantiers.</div></div><button class="btn pri" id="bFrom">Reprendre</button></div>` : ''}
     <div class="bar"><h2 class="grow" style="font-size:20px">Contacts <span class="muted small">${all.length}</span></h2><button class="btn" id="bImp">Importer</button><button class="btn" id="bExp">Exporter</button><button class="btn pri" id="bNew">+ Nouveau contact</button></div>
     <div class="bar"><input type="search" id="q" placeholder="Rechercher : nom, ville, interlocuteur, lot…" value="${esc(F.q)}" style="max-width:420px"></div>
-    <div class="levels bar"><button class="chip${!F.role ? ' on' : ''}" data-r="">Tous (${all.length})</button>${counts.map(([k, n]) => `<button class="chip${F.role === k ? ' on' : ''}" data-r="${k}">${esc(roleName(k))} (${n})</button>`).join('')}</div>
+    <div class="levels bar"><button class="chip${!F.role ? ' on' : ''}" data-r="">Tous (${all.length})</button>${counts.map(([k, n]) => `<button class="chip${F.role === k ? ' on' : ''}" data-r="${k}">${esc(catName(k))} (${n})</button>`).join('')}</div>
     <div id="lst"></div>`;
   const draw = () => {
-    const q = norm(F.q), list = all.filter(c => (!F.role || roleOf(c) === F.role) && (!q || norm([c.nom, c.ville, c.cp, c.notes, Carnet.lotsTxt(c), ...c.personnes.map(p => [Carnet.fullName(p), p.fonction, p.email].join(' '))].join(' ')).includes(q)));
-    const groups = ROLES.map(([k]) => [k, list.filter(c => roleOf(c) === k)]).filter(g => g[1].length);
-    $('#lst', m).innerHTML = groups.map(([k, cs]) => `<div class="lothead"><span class="code">${k}</span>${esc(roleName(k))}</div><div class="list">${cs.map(c => { const u = uses(c.id);
-      return `<div class="card" data-c="${c.id}" style="cursor:pointer"><div class="row" style="align-items:flex-start"><div class="grow"><b>${esc(c.nom)}</b>${c.agence ? ' <span class="badge b-refusee">votre agence</span>' : ''}<div class="small muted">${esc([[c.cp, c.ville].filter(Boolean).join(' '), c.lots.length ? 'lots ' + Carnet.lotsTxt(c) : '', u.length ? 'chantiers : ' + u.join(', ') : ''].filter(Boolean).join(' · '))}</div></div>
+    const q = norm(F.q), list = all.filter(c => (!F.role || catOf(c) === F.role) && (!q || norm([c.nom, c.ville, c.cp, c.notes, Carnet.lotsTxt(c), ...c.personnes.map(p => [Carnet.fullName(p), p.fonction, p.email].join(' '))].join(' ')).includes(q)));
+    const groups = ROLE_CATS.map(([k]) => [k, list.filter(c => catOf(c) === k)]).filter(g => g[1].length);
+    $('#lst', m).innerHTML = groups.map(([k, cs]) => `<div class="lothead">${esc(catName(k))}</div><div class="list">${cs.map(c => { const u = uses(c.id);
+      return `<div class="card" data-c="${c.id}" style="cursor:pointer"><div class="row" style="align-items:flex-start"><div class="grow"><b>${esc(c.nom)}</b> <span class="tag-role">${esc(c.agence ? 'Architecte' : roleName(c.role))}</span>${c.agence ? ' <span class="badge b-refusee">votre agence</span>' : ''}<div class="small muted">${esc([[c.cp, c.ville].filter(Boolean).join(' '), c.lots.length ? 'lots ' + Carnet.lotsTxt(c) : '', u.length ? 'chantiers : ' + u.join(', ') : ''].filter(Boolean).join(' · '))}</div></div>
         <span class="row small" style="gap:12px;flex-wrap:wrap;justify-content:flex-end">${c.tel ? `<a href="tel:${esc(c.tel.replace(/\s/g, ''))}" data-stop>${esc(c.tel)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}" data-stop>${esc(c.email)}</a>` : ''}</span></div>
         ${c.personnes.length ? `<div class="small" style="margin-top:6px;display:flex;flex-direction:column;gap:3px">${c.personnes.map(p => `<span>${p.principal && c.personnes.length > 1 ? '★ ' : ''}<b>${esc(Carnet.fullName(p))}</b>${p.fonction ? ' · <span class="muted">' + esc(p.fonction) + '</span>' : ''}${p.mobile || p.tel ? ` · <a href="tel:${esc((p.mobile || p.tel).replace(/\s/g, ''))}" data-stop>${esc(p.mobile || p.tel)}</a>` : ''}${p.email ? ` · <a href="mailto:${esc(p.email)}" data-stop>${esc(p.email)}</a>` : ''}</span>`).join('')}</div>` : ''}</div>`; }).join('')}</div>`).join('')
       || `<div class="empty"><b>${all.length ? 'Aucun contact ne correspond' : 'Carnet vide'}</b>${all.length ? '' : 'Ajoutez vos contacts un par un, importez un fichier Excel, CSV ou vCard, ou reprenez les intervenants de vos chantiers.'}</div>`;
@@ -41,7 +41,7 @@ async function viewList(m) {
   draw();
   $('#q', m).oninput = e => { F.q = e.target.value; draw(); };
   $$('[data-r]', m).forEach(b => b.onclick = () => { F.role = b.dataset.r; render(); });
-  $('#bNew', m).onclick = async () => { if (await Carnet.edit(null, { role: F.role || 'ENT' })) render(); };
+  $('#bNew', m).onclick = async () => { if (await Carnet.edit(null, { role: catRoles(F.role)[0] || 'ENT' })) render(); };
   if ($('#bFrom', m)) $('#bFrom', m).onclick = async () => { const r = await Carnet.fromChantiers(); toast(`${r.made} fiche(s) créée(s), ${r.linked} intervenant(s) relié(s)`); render(); };
   $('#bExp', m).onclick = () => { const sh = sheet('Exporter le carnet', `<button class="card ch" id="eX" style="text-align:left;cursor:pointer"><span class="grow"><b>Excel</b><div class="small muted">Une ligne par interlocuteur, filtrable. À ouvrir ou à transmettre.</div></span></button>
       <button class="card ch" id="eJ" style="text-align:left;cursor:pointer"><span class="grow"><b>Format d'échange TerraSuite (JSON)</b><div class="small muted">Pour les autres applications de la suite (TerraEstim, TerraPlanning) ou pour une autre agence.</div></span></button>`);

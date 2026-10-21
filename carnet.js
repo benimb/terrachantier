@@ -55,7 +55,7 @@ const Carnet = (() => {
       <div class="row" style="margin-top:6px"><label class="row small muted" style="gap:5px"><input type="radio" name="princ" data-pf="principal"${p.principal ? ' checked' : ''}> ${isAg ? 'Architecte par défaut (émetteur des CR et des photos)' : 'Interlocuteur principal'}</label><span class="grow"></span><button type="button" class="btn sm danger" data-prm>Retirer</button></div></div>`;
   }
   function formHTML(c, { isAg } = {}) {
-    return `<h3 class="fsec">${isAg ? 'Agence' : 'Société ou organisme'}</h3><div class="grid2">${isAg ? '' : `<label class="f">Rôle<select data-cf="role">${ROLES.map(([k, t]) => `<option value="${k}"${c.role === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`}
+    return `<h3 class="fsec">${isAg ? 'Agence' : 'Société ou organisme'}</h3><div class="grid2">${isAg ? '' : `<label class="f">Rôle<select data-cf="role">${roleOptions(c.role)}</select></label>`}
       <label class="f">${isAg ? "Nom de l'agence" : 'Société ou organisme'}<input type="text" data-cf="nom" value="${esc(c.nom)}"></label>
       <label class="f">Adresse<input type="text" data-cf="adresse" value="${esc(c.adresse)}"></label><label class="f">Code postal<input type="text" data-cf="cp" value="${esc(c.cp)}" inputmode="numeric"></label>
       <label class="f">Ville<input type="text" data-cf="ville" value="${esc(c.ville)}"></label><label class="f">Téléphone (standard)<input type="tel" data-cf="tel" value="${esc(c.tel)}"></label>
@@ -104,13 +104,13 @@ const Carnet = (() => {
   /* choix dans le carnet : rend { c, pid } (organisme et interlocuteur), ou null */
   function pick({ role = '', title = 'Choisir dans le carnet', exclude = [], lot = '' } = {}) {
     return new Promise(res => {
-      let flt = role, q = '', out = null;
+      let flt = role ? roleCat(role) : '', q = '', out = null; const cOf = c => roleCat(c.agence ? 'MOE' : c.role);
       const sh = sheet(title, `<input type="search" id="kQ" placeholder="Rechercher (nom, ville, interlocuteur, lot)">
         <div class="levels" id="kR"></div><div class="list" id="kL"></div>`, `<button class="btn" id="kNew">+ Nouveau contact</button><span class="grow"></span><button class="btn" data-close>Annuler</button>`);
       const draw = () => {
         const hab = c => lot && c.lots.includes(lot) ? 1 : 0, L = sorted().filter(c => !exclude.includes(c.id)).sort((a, b) => hab(b) - hab(a));
-        $('#kR', sh.el).innerHTML = `<button class="chip${!flt ? ' on' : ''}" data-r="">Tous (${L.length})</button>` + ROLES.map(([k]) => [k, L.filter(c => (c.agence ? 'MOE' : c.role) === k).length]).filter(x => x[1]).map(([k, n]) => `<button class="chip${flt === k ? ' on' : ''}" data-r="${k}">${esc(roleName(k))} (${n})</button>`).join('');
-        const nq = norm(q), list = L.filter(c => (!flt || (c.agence ? 'MOE' : c.role) === flt) && (!nq || norm([c.nom, c.ville, lotsTxt(c), ...c.personnes.map(fullName)].join(' ')).includes(nq)));
+        $('#kR', sh.el).innerHTML = `<button class="chip${!flt ? ' on' : ''}" data-r="">Tous (${L.length})</button>` + ROLE_CATS.map(([k]) => [k, L.filter(c => cOf(c) === k).length]).filter(x => x[1]).map(([k, n]) => `<button class="chip${flt === k ? ' on' : ''}" data-r="${k}">${esc(catName(k))} (${n})</button>`).join('');
+        const nq = norm(q), list = L.filter(c => (!flt || cOf(c) === flt) && (!nq || norm([c.nom, c.ville, lotsTxt(c), ...c.personnes.map(fullName)].join(' ')).includes(nq)));
         $('#kL', sh.el).innerHTML = list.map(c => `<div class="card"><button type="button" class="ch pickrow" data-k="${c.id}" data-pp=""><span class="ico">${esc((c.agence ? 'MOE' : c.role).slice(0, 4))}</span><span class="grow" style="text-align:left"><b>${esc(c.nom)}</b>${hab(c) ? ` <span class="badge b-levee">lot ${esc(lot)} habituel</span>` : ''}<div class="small muted">${esc(resume(c))}</div></span></button>
           ${c.personnes.length > 1 ? `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px;padding-left:56px">${c.personnes.map(p => `<button type="button" class="chip" data-k="${c.id}" data-pp="${p.id}">${esc(fullName(p) || p.email || '?')}${p.fonction ? ' · ' + esc(p.fonction) : ''}</button>`).join('')}</div>` : ''}</div>`).join('')
           || `<div class="empty"><b>Aucun contact${flt ? ' dans ce rôle' : ''}</b>Ajoutez-le avec « Nouveau contact ».</div>`;
@@ -118,13 +118,13 @@ const Carnet = (() => {
         $$('[data-k]', sh.el).forEach(b => b.onclick = () => { out = { c: byId(b.dataset.k), pid: b.dataset.pp }; sh.close(); });
       };
       $('#kQ', sh.el).oninput = e => { q = e.target.value; draw(); };
-      $('#kNew', sh.el).onclick = async () => { const c = await edit(null, { role: flt || role || 'ENT', nom: q }); if (c) { out = { c, pid: '' }; sh.close(); } };
+      $('#kNew', sh.el).onclick = async () => { const c = await edit(null, { role: role || catRoles(flt)[0] || 'ENT', nom: q }); if (c) { out = { c, pid: '' }; sh.close(); } };
       draw(); sh.bg.addEventListener('closed', () => res(out));
     });
   }
 
   /* ---------- import et export ---------- */
-  const ROLE_GUESS = [[/ouvrage d.?ouvrage|^moa$|ma[iî]tre d.?ouvrage|client|bailleur|promoteur/i, 'MOA'], [/assistan|^amo$/i, 'AMO'], [/contr[oô]le|^bct$|bureau veritas|socotec|apave|qualiconsult|dekra/i, 'BCT'], [/sps|s[ée]curit[ée].*sant/i, 'CSPS'], [/\bopc\b|ordonnancement/i, 'OPC'], [/bet|[ée]tudes|ing[ée]nierie|fluides|structure|thermi|acousti|[ée]conomiste/i, 'BET'], [/archi|ma[iî]tr.*.oeuvre|ma[iî]trise d.?.uvre|^moe$/i, 'MOE'], [/concession|enedis|grdf|orange|eau de|veolia|suez/i, 'CONC'], [/utilisateur|exploitant|occupant|locataire/i, 'USR'], [/entreprise|^ent$|sous-traitant/i, 'ENT']];
+  const ROLE_GUESS = [[/[ée]conomiste/i, 'ECO'], [/paysag/i, 'PAY'], [/ouvrage d.?ouvrage|^moa$|ma[iî]tre d.?ouvrage|client|bailleur|promoteur/i, 'MOA'], [/assistan|^amo$/i, 'AMO'], [/contr[oô]le|^bct$|bureau veritas|socotec|apave|qualiconsult|dekra/i, 'BCT'], [/sps|s[ée]curit[ée].*sant/i, 'CSPS'], [/\bopc\b|ordonnancement/i, 'OPC'], [/bet|[ée]tudes|ing[ée]nierie|fluides|structure|thermi|acousti|[ée]conomiste/i, 'BET'], [/archi|ma[iî]tr.*.oeuvre|ma[iî]trise d.?.uvre|^moe$/i, 'MOE'], [/concession|enedis|grdf|orange|eau de|veolia|suez/i, 'CONC'], [/utilisateur|exploitant|occupant|locataire/i, 'USR'], [/entreprise|^ent$|sous-traitant/i, 'ENT']];
   const guessRole = s => { s = String(s || ''); const k = ROLES.find(r => norm(r[0]) === norm(s) || norm(r[1]) === norm(s)); if (k) return k[0]; const g = ROLE_GUESS.find(([re]) => re.test(s)); return g ? g[1] : ''; };
   const COLS = { role: /^(r[ôo]le|type|cat[ée]gorie|qualit[ée])/i, nom: /soci[ée]t[ée]|entreprise|organisme|raison|structure|^nom de la|^compagnie|^company/i, prenom: /pr[ée]nom|first/i, pnom: /^nom$|^nom du contact|^last|^contact$|interlocuteur|^nom de famille/i, civ: /civilit/i, fonction: /fonction|poste|titre/i, mobile: /mobile|portable|gsm/i, tel: /t[ée]l|phone/i, email: /mail|courriel/i, adresse: /adresse|address|rue/i, cp: /code postal|^cp$|postal|zip/i, ville: /ville|commune|city/i, siret: /siret|siren/i, lots: /lot|corps/i, site: /site|web|url/i, notes: /note|remarque|comment/i };
   async function importFile(file) {

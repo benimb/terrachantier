@@ -15,8 +15,14 @@ const ICON = {
   share: '<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>'
 };
 const DEFAULT_LOTS = [['00', 'Généralités'], ['01', 'Démolition, désamiantage'], ['02', 'Gros œuvre, maçonnerie'], ['03', 'Charpente, couverture'], ['04', 'Étanchéité'], ['05', 'Menuiseries extérieures'], ['06', 'Serrurerie, métallerie'], ['07', 'Plâtrerie, cloisons, faux plafonds'], ['08', 'Menuiseries intérieures'], ['09', 'Revêtements de sols et murs'], ['10', 'Peinture'], ['11', 'Électricité courants forts et faibles'], ['12', 'Plomberie, sanitaires'], ['13', 'Chauffage, ventilation, climatisation'], ['14', 'Ascenseurs'], ['15', 'VRD, espaces verts']];
-const ROLES = [['MOA', "Maître d'ouvrage"], ['AMO', "Assistance à maîtrise d'ouvrage"], ['MOE', "Maîtrise d'œuvre"], ['BET', "Bureau d'études"], ['BCT', 'Bureau de contrôle'], ['CSPS', 'Coordination SPS'], ['OPC', 'OPC'], ['ENT', 'Entreprise'], ['USR', 'Utilisateur, exploitant'], ['CONC', 'Concessionnaire'], ['AUT', 'Autre']];
+/* rôles regroupés par catégorie : la maîtrise d'œuvre réunit l'architecte et les bureaux d'études, etc. (clé MOE conservée pour l'architecte) */
+const ROLE_CATS = [['MOA', "Maîtrise d'ouvrage", [['MOA', "Maître d'ouvrage"], ['AMO', "Assistance à maîtrise d'ouvrage"]]], ['MOE', "Maîtrise d'œuvre", [['MOE', 'Architecte'], ['BET', "Bureau d'études"], ['ECO', 'Économiste'], ['PAY', 'Paysagiste']]],
+  ['CTL', 'Contrôle et coordination', [['BCT', 'Bureau de contrôle'], ['CSPS', 'Coordination SPS'], ['OPC', 'OPC']]], ['ENT', 'Entreprises', [['ENT', 'Entreprise']]], ['AUT', 'Autres intervenants', [['USR', 'Utilisateur, exploitant'], ['CONC', 'Concessionnaire'], ['AUT', 'Autre']]]];
+const ROLES = ROLE_CATS.flatMap(c => c[2]);
 const roleName = k => (ROLES.find(r => r[0] === k) || ROLES[ROLES.length - 1])[1], roleRank = k => { const i = ROLES.findIndex(r => r[0] === k); return i < 0 ? 99 : i; };
+const roleCat = k => (ROLE_CATS.find(c => c[2].some(r => r[0] === k)) || ROLE_CATS[ROLE_CATS.length - 1])[0], catName = c => (ROLE_CATS.find(x => x[0] === c) || ROLE_CATS[ROLE_CATS.length - 1])[1];
+const catRoles = c => (ROLE_CATS.find(x => x[0] === c) || [0, 0, []])[2].map(r => r[0]);
+const roleOptions = sel => ROLE_CATS.map(([, t, rs]) => `<optgroup label="${esc(t)}">${rs.map(([k, n]) => `<option value="${k}"${sel === k ? ' selected' : ''}>${esc(n)}</option>`).join('')}</optgroup>`).join('');
 
 function toast(msg, ms = 2600) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
 function sheet(title, body, foot = '', { wide } = {}) {

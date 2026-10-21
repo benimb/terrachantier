@@ -49,10 +49,10 @@ async function exportCR(v) {
     doc.setFontSize(7.5); doc.setTextColor(110); doc.setFont('helvetica', 'bold'); ['Organisme', 'Rôle', 'Interlocuteur', 'Présence', 'Convoqué prochaine réunion'].forEach((t, i) => doc.text(doc.splitTextToSize(pdfTxt(t), i === 4 ? W - M - cols[4] : 40), cols[i], ctx.y + 3)); ctx.y += 8;
     let lastRole = null;
     for (const e of ents) { ctx.need(6); const p = presOf(v, e.id), st = PRES[p] || '-', cv = convNext(v, e);
-      if (e.role !== lastRole) { lastRole = e.role; doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(90, 55, 140); doc.text(pdfTxt(roleName(e.role)), M, ctx.y + 3.3); ctx.y += 4.6; }
+      if (roleCat(e.role) !== lastRole) { lastRole = roleCat(e.role); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(90, 55, 140); doc.text(pdfTxt(catName(lastRole)), M, ctx.y + 3.3); ctx.y += 4.6; }
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30);
       const lots = e.role === 'ENT' ? lotsOf().filter(l => l.entrepriseId === e.id).map(l => l.code).join(', ') : '';
-      doc.text(doc.splitTextToSize(pdfTxt(e.nom), 53)[0] || '', cols[0], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt(e.role === 'ENT' ? (lots ? 'Lot ' + lots : 'Entreprise') : e.role), 28)[0] || '', cols[1], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt([e.contact, e.fonction].filter(Boolean).join(', ')), 48)[0] || '', cols[2], ctx.y + 3.5);
+      doc.text(doc.splitTextToSize(pdfTxt(e.nom), 53)[0] || '', cols[0], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt(e.role === 'ENT' ? (lots ? 'Lot ' + lots : 'Entreprise') : roleName(e.role)), 28)[0] || '', cols[1], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt([e.contact, e.fonction].filter(Boolean).join(', ')), 48)[0] || '', cols[2], ctx.y + 3.5);
       doc.setTextColor(...(p === 'O' ? [47, 143, 91] : p === 'N' ? [194, 65, 12] : p === 'R' ? [190, 130, 10] : [110, 110, 110])); doc.setFont('helvetica', 'bold'); doc.text(p || '-', cols[3], ctx.y + 3.5); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); if (p) doc.text(pdfTxt(st), cols[3] + 4, ctx.y + 3.5);
       doc.setFontSize(9); doc.setTextColor(...(cv ? [30, 30, 30] : [150, 150, 150])); doc.text(cv ? 'Oui' : 'Non', cols[4], ctx.y + 3.5);
       ctx.y += 5.2; doc.setDrawColor(230); doc.line(M, ctx.y, W - M, ctx.y); }
