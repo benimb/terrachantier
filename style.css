@@ -104,3 +104,7 @@ a.btn{text-decoration:none;color:inherit}
 a.btn.pri{color:var(--accent-ink)}
 .sheet>.body>*{flex-shrink:0}
 @media (max-width:600px){.bar>h2.grow{flex:1 1 100%}}
+.qnum{font:700 12.5px "Space Grotesk",Inter,sans-serif;background:var(--ink);color:var(--bg);border-radius:5px;padding:3px 7px;white-space:nowrap;flex:none}
+.qsect{margin-top:14px}
+.qsect>h4{font:700 15px "Space Grotesk",Inter,sans-serif;margin:0 0 4px;padding:8px 10px;background:var(--soft);color:var(--accent);border-radius:8px}
+.pres button.on[data-v=O]{background:var(--ok);color:#fff;border-color:var(--ok)} .pres button.on[data-v=N]{background:var(--warn);color:#fff;border-color:var(--warn)} .pres button.on[data-v=R]{background:#d4930d;color:#fff;border-color:#d4930d}

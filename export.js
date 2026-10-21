@@ -24,12 +24,12 @@ async function pdfHeader(ctx, big, lines) {
   for (const l of lines.filter(Boolean)) ctx.text(l, { size: 9.5, gap: .3 }); ctx.y += 2; ctx.rule();
 }
 /* photos d'un bloc : trois par ligne, légende dessous ; extrait de plan quand elles sont localisées */
-async function pdfPhotos(ctx, ids, numStart = 1) {
+async function pdfPhotos(ctx, ids, numStart = 1, ref = '') {
   const ph = ids.map(photoById).filter(Boolean); if (!ph.length) return;
   const { doc, M, W } = ctx, gap = 3, cw = (W - 2 * M - 2 * gap) / 3;
   for (let i = 0; i < ph.length; i += 3) {
     const row = ph.slice(i, i + 3), ims = await Promise.all(row.map(p => imgData(p.blobId))), hs = ims.map(im => im ? Math.min(cw * im.h / im.w, cw * 1.05) : 0);
-    doc.setFontSize(7.5); const caps = row.map((p, k) => doc.splitTextToSize(pdfTxt(`${numStart + i + k}. ${[phLoc(p), phTxt(p)].filter(Boolean).join(' : ') || fmtD(p.date)}`), cw).slice(0, 3));
+    doc.setFontSize(7.5); const caps = row.map((p, k) => doc.splitTextToSize(pdfTxt(`Ph. ${numStart + i + k}${ref ? ' (' + ref + ')' : ''} - ${[phLoc(p), phTxt(p)].filter(Boolean).join(' : ') || fmtD(p.date)}`), cw).slice(0, 3));
     const rh2 = Math.max(...hs) + 2.5 + 3.1 * Math.max(...caps.map(c => c.length)); ctx.need(rh2 + 2);
     row.forEach((p, k) => { const im = ims[k]; if (!im) return; const w = Math.min(cw, hs[k] * im.w / im.h), x = M + k * (cw + gap) + (cw - w) / 2; doc.addImage(im.url, 'JPEG', x, ctx.y, w, hs[k]);
       doc.setFontSize(7.5); doc.setTextColor(90); doc.setFont('helvetica', 'normal'); caps[k].forEach((l, j) => doc.text(l, M + k * (cw + gap), ctx.y + hs[k] + 3.4 + j * 3.1)); });
@@ -42,38 +42,48 @@ async function exportCR(v) {
   toast('Préparation du PDF…'); const ctx = pdfDoc(`CR n° ${v.numero} du ${fmtD(v.date)}`), { doc, M, W } = ctx;
   const em = emetteurOf(v);
   await pdfHeader(ctx, `Compte-rendu de chantier n° ${v.numero}`, [`Visite du ${fmtDL(v.date)}${v.heure ? ' à ' + v.heure.replace(':', ' h ') : ''}${v.meteo ? ' · météo : ' + v.meteo : ''}`, em && 'Émetteur : ' + entLabel(em), v.redacteur && 'Rédigé par ' + v.redacteur]);
-  // présences
-  const ents = intervenants().filter(e => e.convoque !== false || (v.presents || {})[e.id]);
-  if (ents.length) { ctx.text('Présences', { size: 11.5, bold: true, gap: 1.5 }); const cols = [M, M + 62, M + 104, M + 158];
-    doc.setFontSize(8); doc.setTextColor(110); doc.setFont('helvetica', 'bold'); ['Organisme', 'Rôle', 'Interlocuteur', 'Présence'].forEach((t, i) => doc.text(t, cols[i], ctx.y + 3)); ctx.y += 5;
-    for (const e of ents) { ctx.need(6); const st = { P: 'Présent', A: 'Absent', E: 'Excusé' }[(v.presents || {})[e.id]] || '-'; doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30);
+  // première page : présences, convocations, prochaine réunion
+  const ents = crEnts(v);
+  if (ents.length) { ctx.text('Présences et convocations', { size: 11.5, bold: true, gap: 1 }); ctx.text('O présent · N absent · R en retard · E excusé', { size: 7.5, color: [120, 120, 120], gap: 1.5 });
+    const cols = [M, M + 55, M + 85, M + 135, M + 158];
+    doc.setFontSize(7.5); doc.setTextColor(110); doc.setFont('helvetica', 'bold'); ['Organisme', 'Rôle', 'Interlocuteur', 'Présence', 'Convoqué prochaine réunion'].forEach((t, i) => doc.text(doc.splitTextToSize(pdfTxt(t), i === 4 ? W - M - cols[4] : 40), cols[i], ctx.y + 3)); ctx.y += 8;
+    let lastRole = null;
+    for (const e of ents) { ctx.need(6); const p = presOf(v, e.id), st = PRES[p] || '-', cv = convNext(v, e);
+      if (e.role !== lastRole) { lastRole = e.role; doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(90, 55, 140); doc.text(pdfTxt(roleName(e.role)), M, ctx.y + 3.3); ctx.y += 4.6; }
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30);
       const lots = e.role === 'ENT' ? lotsOf().filter(l => l.entrepriseId === e.id).map(l => l.code).join(', ') : '';
-      doc.text(doc.splitTextToSize(pdfTxt(e.nom), 58)[0] || '', cols[0], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt(e.role === 'ENT' ? (lots ? 'Lot ' + lots : 'Entreprise') : e.role), 40)[0] || '', cols[1], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt([e.contact, e.fonction].filter(Boolean).join(', ')), 52)[0] || '', cols[2], ctx.y + 3.5);
-      doc.setTextColor(...(st === 'Présent' ? [47, 143, 91] : st === 'Absent' ? [194, 65, 12] : [110, 110, 110])); doc.text(st, cols[3], ctx.y + 3.5); ctx.y += 5.2; doc.setDrawColor(230); doc.line(M, ctx.y, W - M, ctx.y); }
+      doc.text(doc.splitTextToSize(pdfTxt(e.nom), 53)[0] || '', cols[0], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt(e.role === 'ENT' ? (lots ? 'Lot ' + lots : 'Entreprise') : e.role), 28)[0] || '', cols[1], ctx.y + 3.5); doc.text(doc.splitTextToSize(pdfTxt([e.contact, e.fonction].filter(Boolean).join(', ')), 48)[0] || '', cols[2], ctx.y + 3.5);
+      doc.setTextColor(...(p === 'O' ? [47, 143, 91] : p === 'N' ? [194, 65, 12] : p === 'R' ? [190, 130, 10] : [110, 110, 110])); doc.setFont('helvetica', 'bold'); doc.text(p || '-', cols[3], ctx.y + 3.5); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); if (p) doc.text(pdfTxt(st), cols[3] + 4, ctx.y + 3.5);
+      doc.setFontSize(9); doc.setTextColor(...(cv ? [30, 30, 30] : [150, 150, 150])); doc.text(cv ? 'Oui' : 'Non', cols[4], ctx.y + 3.5);
+      ctx.y += 5.2; doc.setDrawColor(230); doc.line(M, ctx.y, W - M, ctx.y); }
     ctx.y += 3; }
   if (v.autres) ctx.text('Autres participants : ' + v.autres, { size: 9.5, gap: 3 });
-  ctx.rule();
-  // observations par lot
-  ctx.text('Observations', { size: 11.5, bold: true, gap: 2 });
-  const groups = new Map(); for (const o of v.observations || []) { const k = o.lotId || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); }
-  const keys = [...groups.keys()].sort((a, b) => (lotById(a) ? lotById(a).code : '~').localeCompare(lotById(b) ? lotById(b).code : '~'));
-  if (!keys.length) ctx.text('Aucune observation.', { size: 9.5, color: [110, 110, 110] });
-  let nph = 1;
-  for (const k of keys) {
-    const l = lotById(k), ent = l && entById(l.entrepriseId); ctx.need(14); doc.setFillColor(240, 235, 247); doc.rect(M, ctx.y, W - 2 * M, 7, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(90, 55, 140);
-    doc.text(pdfTxt(l ? `Lot ${l.code} - ${l.nom}` : 'Généralités'), M + 2, ctx.y + 4.9); if (ent) { doc.setFont('helvetica', 'normal'); doc.setTextColor(100); doc.text(pdfTxt(ent.nom), W - M - 2, ctx.y + 4.9, { align: 'right' }); } ctx.y += 9.5;
-    for (const o of groups.get(k)) {
-      const st = OBS_ST[o.statut] || '', col = o.statut === 'fait' ? [47, 143, 91] : o.statut === 'info' ? [47, 111, 181] : [194, 65, 12];
-      ctx.need(10); doc.setFillColor(...col); doc.rect(M, ctx.y + .6, 1.2, 4, 'F');
-      if (o.localisation) ctx.text(o.localisation, { size: 8.5, bold: true, color: [90, 55, 140], indent: 4, gap: .2 });
-      ctx.text(o.texte || '(sans texte)', { size: 10, indent: 4, gap: .4 });
-      ctx.text([st, o.echeance && 'échéance : ' + fmtD(o.echeance), o.origine && 'depuis le CR n° ' + o.origine].filter(Boolean).join(' · '), { size: 8.5, color: col, indent: 4, gap: 1.6 });
-      if ((o.photoIds || []).length) { await pdfPhotos(ctx, o.photoIds, nph); nph += o.photoIds.length; ctx.y += 1; }
-      ctx.y += 1.5;
+  if (v.prochaine) { ctx.rule(); ctx.text('Prochaine réunion : ' + v.prochaine, { size: 10.5, bold: true, gap: 1 }); const conv = ents.filter(e => convNext(v, e)).map(e => e.nom); if (conv.length) ctx.text('Convoqués : ' + conv.join(', '), { size: 9, color: [80, 80, 80], gap: 2 }); }
+  const qs = v.observations || [], cnt = s => qs.filter(o => qSect(v, o) === s).length;
+  ctx.rule(); ctx.text(`Questions : ${cnt('jour')} du jour, ${cnt('encours')} en cours, ${cnt('reglees')} réglée(s) à cette réunion. Numérotation : C03.04 = 4e question posée au compte-rendu n° 3.`, { size: 8.5, color: [100, 100, 100] });
+  // questions : du jour, en cours, réglées ; par lot
+  doc.addPage(); ctx.y = M + 4;
+  const lotKey = k => lotById(k) ? lotById(k).code : '~'; let nph = 1;
+  for (const [sk, st] of Q_SECT) {
+    const list = qs.filter(o => qSect(v, o) === sk).sort((a, b) => lotKey(a.lotId).localeCompare(lotKey(b.lotId)) || (a.cr - b.cr) || (a.seq - b.seq));
+    ctx.need(22); doc.setFillColor(122, 79, 176); doc.rect(M, ctx.y, W - 2 * M, 8, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255); doc.text(pdfTxt(`${st} (${list.length})`), M + 2.5, ctx.y + 5.5); ctx.y += 11;
+    if (!list.length) { ctx.text(sk === 'jour' ? 'Aucune question posée à cette réunion.' : sk === 'encours' ? 'Aucune question en cours.' : 'Aucune question réglée à cette réunion.', { size: 9, color: [120, 120, 120], gap: 3 }); continue; }
+    let last = null;
+    for (const o of list) {
+      if (o.lotId !== last) { last = o.lotId; const l = lotById(o.lotId), ent = l && entById(l.entrepriseId); ctx.need(18); doc.setFillColor(240, 235, 247); doc.rect(M, ctx.y, W - 2 * M, 6.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(90, 55, 140);
+        doc.text(pdfTxt(l ? `Lot ${l.code} - ${l.nom}` : 'Généralités'), M + 2, ctx.y + 4.5); if (ent) { doc.setFont('helvetica', 'normal'); doc.setTextColor(100); doc.text(pdfTxt(ent.nom), W - M - 2, ctx.y + 4.5, { align: 'right' }); } ctx.y += 8.5; }
+      const col = o.statut === 'fait' ? [47, 143, 91] : o.statut === 'info' ? [47, 111, 181] : [194, 65, 12];
+      ctx.need(12); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...col); doc.text(qNum(o), M, ctx.y + 3.6);
+      if (o.localisation) ctx.text(o.localisation, { size: 8.5, bold: true, color: [90, 55, 140], indent: 19, gap: .2 });
+      ctx.text(o.texte || '(sans texte)', { size: 10, indent: 19, gap: .4 });
+      ctx.text([OBS_ST[o.statut], o.statut === 'fait' && o.regleeAu ? 'au CR n° ' + o.regleeAu : '', o.echeance && o.statut !== 'fait' ? 'échéance : ' + fmtD(o.echeance) : '', o.cr && o.cr < v.numero ? 'posée au CR n° ' + o.cr : '', o.photosCR && !(o.photoIds || []).length ? 'photos au CR n° ' + o.photosCR : ''].filter(Boolean).join(' · '), { size: 8, color: col, indent: 19, gap: 1.4 });
+      if ((o.photoIds || []).length) { await pdfPhotos(ctx, o.photoIds, nph, qNum(o)); nph += o.photoIds.length; ctx.y += 1; }
+      doc.setDrawColor(232); doc.line(M + 19, ctx.y, W - M, ctx.y); ctx.y += 2.5;
     }
+    ctx.y += 3;
   }
-  ctx.rule(); if (v.prochaine) ctx.text('Prochaine réunion : ' + v.prochaine, { size: 10, bold: true, gap: 2 }); const dest = intervenants().filter(e => e.convoque !== false).map(e => e.nom + (e.contact ? ' (' + e.contact + ')' : '')); if (dest.length || v.diffusion) ctx.text('Diffusion : ' + [dest.join(', '), v.diffusion].filter(Boolean).join(' ; '), { size: 9, color: [90, 90, 90] });
-  ctx.finish(`${S.ch.code || S.ch.nom} - CR ${String(v.numero).padStart(2, '0')} du ${v.date}`);
+  ctx.rule(); const dest = intervenants().filter(e => e.convoque !== false).map(e => e.nom + (e.contact ? ' (' + e.contact + ')' : '')); if (dest.length || v.diffusion) ctx.text('Diffusion : ' + [dest.join(', '), v.diffusion].filter(Boolean).join(' ; '), { size: 9, color: [90, 90, 90] });
+  ctx.finish(`${S.ch.code || S.ch.nom} - CR ${pad2(v.numero)} du ${v.date}`);
   v.diffuseLe = v.diffuseLe || today(); await save('visites', v);
 }
 async function exportReserves(list, F = {}) {
