@@ -33,6 +33,13 @@ function sheet(title, body, foot = '', { wide } = {}) {
   bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-close]')) close(); });
   return { el: bg.querySelector('.sheet'), bg, close };
 }
+/* retour à la page d'accueil TerraSuite : l'onglet ouvert depuis l'accueil (sur l'ordinateur) se referme pour y revenir ;
+   sinon (application installée, téléphone), page d'accueil en ligne */
+function goSuite() {
+  if (window.opener && !window.opener.closed) { try { window.opener.focus(); } catch (e) {} window.close(); }
+  setTimeout(() => { location.href = 'terrasuite.html'; }, 250);
+}
+const suiteBtn = () => `<button class="btn sm suite-btn" onclick="goSuite()" title="Accueil TerraSuite">← TerraSuite</button>`;
 /* enregistrement d'un service worker commun (mise à jour automatique) */
 function registerSW() {
   if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;

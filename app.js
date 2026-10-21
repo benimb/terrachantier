@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.5.1';
+const APP_VERSION = '0.5.2';
 /* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
@@ -54,7 +54,7 @@ async function render() {
   S.ch = null; S._fresh = false; return viewHome(app);
 }
 window.addEventListener('hashchange', render);
-const topBar = (title, sub, { back, extra = '' } = {}) => `<div class="top">${back ? `<a class="icon-btn" href="${back}" aria-label="Retour">${ICON.back}</a>` : ''}<h1>${title}${sub ? `<small>${esc(sub)}</small>` : ''}</h1>${extra}<span class="sync" id="syncSt" title="Synchronisation"><i></i></span><button class="icon-btn" id="bSet" aria-label="Réglages">${ICON.gear}</button></div>`;
+const topBar = (title, sub, { back, extra = '' } = {}) => `<div class="top">${back ? `<a class="icon-btn" href="${back}" aria-label="Retour">${ICON.back}</a>` : suiteBtn()}<h1>${title}${sub ? `<small>${esc(sub)}</small>` : ''}</h1>${extra}<span class="sync" id="syncSt" title="Synchronisation"><i></i></span><button class="icon-btn" id="bSet" aria-label="Réglages">${ICON.gear}</button></div>`;
 function bindTop(app) { const b = $('#bSet', app); if (b) b.onclick = settingsSheet; Sync.paint(); }
 
 /* ================= Accueil : chantiers ================= */

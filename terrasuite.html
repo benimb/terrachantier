@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TerraSuite</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f2ee;
+    --surface: #ffffff;
+    --ink: #1c1f22;
+    --muted: #6b6f74;
+    --line: #e2ddd5;
+    --accent: #b5532f;
+    --c-planning: #2f6fb5;
+    --c-estim: #2f8f5b;
+    --c-cr: #7a4fb0;
+    --c-opr: #c2410c;
+    --c-sourcing: #0f766e;
+    --c-geo: #8a5a12;
+    --c-contacts: #9a3b6b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141618; --surface: #1d2023; --ink: #eceae6; --muted: #9a9ea3; --line: #2c3035;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141618; --surface: #1d2023; --ink: #eceae6; --muted: #9a9ea3; --line: #2c3035;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 28px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand svg { width: 36px; height: 36px; }
+  .brand h1 {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 24px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .brand h1 span { color: var(--accent); }
+  .by { font-size: 13px; color: var(--muted); }
+  main { flex: 1; max-width: 1180px; width: 100%; margin: 0 auto; padding: 56px 40px 40px; }
+  .intro { max-width: 640px; margin-bottom: 48px; }
+  .intro h2 {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 36px; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 14px;
+  }
+  .intro p { color: var(--muted); font-size: 16px; line-height: 1.6; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  .app {
+    --c: var(--accent);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 26px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .app:hover, .app:focus-visible {
+    transform: translateY(-3px);
+    border-color: var(--c);
+    box-shadow: 0 10px 28px rgba(0,0,0,.08);
+    outline: none;
+  }
+  .app .top { display: flex; align-items: center; justify-content: space-between; }
+  .logo {
+    width: 56px; height: 56px; border-radius: 12px;
+    background: var(--c);
+    display: grid; place-items: center;
+  }
+  .logo svg { width: 30px; height: 30px; stroke: #fff; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .badge {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+    padding: 4px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .badge.beta { border-color: var(--c); color: var(--c); }
+  .app h3 { font-family: "Space Grotesk", sans-serif; font-size: 21px; font-weight: 700; }
+  .app h3 span { color: var(--c); }
+  .app p { color: var(--muted); font-size: 14.5px; line-height: 1.55; flex: 1; }
+  .open { font-size: 14px; font-weight: 600; color: var(--c); }
+  .app.soon { opacity: .72; }
+  .app.soon:hover { transform: none; box-shadow: none; }
+  footer {
+    padding: 22px 40px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  @media (max-width: 640px) {
+    header, main, footer { padding-left: 16px; padding-right: 16px; }
+    .intro h2 { font-size: 28px; }
+    .grid { grid-template-columns: 1fr; }
+    .by { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 36 36" aria-hidden="true">
+      <rect x="2" y="2" width="32" height="32" rx="8" fill="#b5532f"/>
+      <path d="M9 25 L18 10 L27 25 Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M13.5 25 L18 17.5 L22.5 25" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
+    </svg>
+    <h1>Terra<span>Suite</span></h1>
+  </div>
+  <div class="by">par TERRAFORM</div>
+</header>
+
+<main>
+  <section class="intro">
+    <h2>Les outils de l'architecte et des métiers du bâtiment</h2>
+    <p>Planning, estimation, analyse de parcelle, contacts, comptes-rendus, réception et veille sur les marchés publics : une suite d'applications pensée pour le suivi des projets, de la conception à la livraison.</p>
+  </section>
+
+  <section class="grid">
+    <div class="app soon" style="--c: var(--c-planning)">
+      <div class="top">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M7 13h6M10 17h7"/></svg>
+        </div>
+        <span class="badge beta">Bêta 0.9.1</span>
+      </div>
+      <h3>Terra<span>Planning</span></h3>
+      <p>Plannings de projet et de chantier, diagrammes de Gantt, mise en page imprimée soignée, import des fichiers MS Project.</p>
+      <span class="open" style="color:var(--muted)">Sur l'ordinateur de l'agence (dossier TerraSuite)</span>
+    </div>
+
+    <div class="app soon" style="--c: var(--c-estim)">
+      <div class="top">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h4"/></svg>
+        </div>
+        <span class="badge beta">Bêta 0.8.1</span>
+      </div>
+      <h3>Terra<span>Estim</span></h3>
+      <p>Base de prix alimentée par les DPGF d'appels d'offres, revalorisation par indices BT, estimations APD et PRO, export estimatif et DPGF.</p>
+      <span class="open" style="color:var(--muted)">Sur l'ordinateur de l'agence (dossier TerraSuite)</span>
+    </div>
+
+    <div class="app soon" style="--c: var(--c-geo)">
+      <div class="top">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>
+        </div>
+        <span class="badge beta">Bêta 0.13</span>
+      </div>
+      <h3>Terra<span>Geo</span></h3>
+      <p>Fiche d'une parcelle : cadastre, urbanisme et cartes du PLU, servitudes, risques, environnement OpenStreetMap, calques IGN, maquette 3D de l'existant (toitures LiDAR simplifiées en option), vue Google 3D, exports DXF, glTF et OBJ, points de vue et planches.</p>
+      <span class="open" style="color:var(--muted)">Sur l'ordinateur de l'agence (dossier TerraSuite)</span>
+    </div>
+
+    <a class="app" href="./" style="--c: var(--c-cr)">
+      <div class="top">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>
+        </div>
+        <span class="badge beta">Bêta 0.5.1</span>
+      </div>
+      <h3>Terra<span>Chantier</span></h3>
+      <p>Comptes-rendus de chantier et OPR : photos prises sur le téléphone, avec texte, localisation, destinataire et émetteur, placées sur les plans de niveaux ; comptes-rendus aux questions numérotées (du jour, en cours, réglées), réserves, exports PDF et Excel. S'installe sur le téléphone et fonctionne hors réseau.</p>
+      <span class="open">Ouvrir l'application →</span>
+    </a>
+
+    <a class="app" href="contacts.html" style="--c: var(--c-contacts)">
+      <div class="top">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <span class="badge beta">Bêta 0.1</span>
+      </div>
+      <h3>Terra<span>Contacts</span></h3>
+      <p>Carnet de contacts de la suite : maîtres d'ouvrage, BET, bureaux de contrôle, entreprises et leurs lots habituels, interlocuteurs ; fiche de l'agence et architecte par défaut. Alimente les intervenants et les destinataires des chantiers. Import Excel, CSV, vCard.</p>
+      <span class="open">Ouvrir l'application →</span>
+    </a>
+
+    <div class="app soon" style="--c: var(--c-sourcing)">
+      <div class="top">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8 11h6M11 8v6"/></svg>
+        </div>
+        <span class="badge beta">Bêta 0.2</span>
+      </div>
+      <h3>Terra<span>Sourcing</span></h3>
+      <p>Veille sur les appels d'offres publics : BOAMP en direct et plateformes (AWS) collectées chaque matin, filtres, veilles enregistrées, suivi des réponses, attributions.</p>
+      <span class="open" style="color:var(--muted)">Sur l'ordinateur de l'agence (dossier TerraSuite)</span>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>© 2026 TERRAFORM SAS · applications en ligne : TerraChantier, TerraContacts</span>
+  <span>contact@terraform.archi</span>
+</footer>
+
+</body>
+</html>

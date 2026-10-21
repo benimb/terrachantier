@@ -1,10 +1,10 @@
 /* TerraContacts : carnet de contacts de la suite (maîtres d'ouvrage, bureaux d'études, entreprises…) et fiche de l'agence.
    Les contacts servent aux chantiers (intervenants, destinataires des photos et des CR) et, par le format d'échange, aux autres applications. */
-const APP_VERSION = '0.1';
+const APP_VERSION = '0.1.1';
 const S = { _fresh: true }; // utilisé par la synchronisation
 let F = { role: '', q: '' };
 
-const topBar = () => `<div class="top"><a class="icon-btn" href="./" aria-label="TerraChantier" title="TerraChantier">${ICON.back}</a><h1><span class="brand">Terra<b>Contacts</b></span> <span class="ver">v${APP_VERSION} bêta</span><small>Carnet de contacts de la suite</small></h1><span class="sync" id="syncSt" title="Synchronisation"><i></i></span><button class="icon-btn" id="bSet" aria-label="Réglages">${ICON.gear}</button></div>`;
+const topBar = () => `<div class="top">${suiteBtn()}<h1><span class="brand">Terra<b>Contacts</b></span> <span class="ver">v${APP_VERSION} bêta</span><small>Carnet de contacts de la suite</small></h1><span class="sync" id="syncSt" title="Synchronisation"><i></i></span><button class="icon-btn" id="bSet" aria-label="Réglages">${ICON.gear}</button></div>`;
 const tabs = cur => `<nav class="tabs">${[['', 'Contacts'], ['agence', 'Mon agence']].map(([k, t]) => `<a href="#/${k}" class="${k === cur ? 'on' : ''}">${t}</a>`).join('')}<a href="./">TerraChantier →</a></nav>`;
 
 async function render() {
