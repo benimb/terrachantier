@@ -111,3 +111,5 @@ a.btn.pri{color:var(--accent-ink)}
 .fsec{font:700 13px Inter,sans-serif;color:var(--accent);margin:2px 0 6px;text-transform:uppercase;letter-spacing:.04em}
 .persbox{margin-top:10px;padding:8px 10px;border-left:3px solid var(--accent);background:var(--bg);border-radius:0 8px 8px 0}
 .persline{margin-top:4px;padding-left:8px;border-left:3px solid var(--line);font-size:13.5px}
+.qwho{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.qwho .chip{padding:3px 9px;font-size:12.5px}

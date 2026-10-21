@@ -76,6 +76,7 @@ async function exportCR(v) {
       ctx.need(12); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...col); doc.text(qNum(o), M, ctx.y + 3.6);
       if (o.localisation) ctx.text(o.localisation, { size: 8.5, bold: true, color: [90, 55, 140], indent: 19, gap: .2 });
       ctx.text(o.texte || '(sans texte)', { size: 10, indent: 19, gap: .4 });
+      ctx.text(`De : ${entLabel(qEm(o)) || '-'}   >   À : ${qDestLabel(o)}`, { size: 8, color: [70, 70, 70], indent: 19, gap: .3 });
       ctx.text([OBS_ST[o.statut], o.statut === 'fait' && o.regleeAu ? 'au ' + crName(o.regleeAu) : '', o.echeance && o.statut !== 'fait' ? 'échéance : ' + fmtD(o.echeance) : '', o.cr && o.cr < v.numero ? 'posée au ' + crName(o.cr) : '', o.photosCR && !(o.photoIds || []).length ? 'photos au ' + crName(o.photosCR) : ''].filter(Boolean).join(' · '), { size: 8, color: col, indent: 19, gap: 1.4 });
       if ((o.photoIds || []).length) { await pdfPhotos(ctx, o.photoIds, nph, qNum(o)); nph += o.photoIds.length; ctx.y += 1; }
       doc.setDrawColor(232); doc.line(M + 19, ctx.y, W - M, ctx.y); ctx.y += 2.5;

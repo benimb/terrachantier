@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.4.4';
+const APP_VERSION = '0.4.5';
 /* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
@@ -272,7 +272,14 @@ const prevVisite = v => S.visites.filter(x => x.numero < v.numero).sort((a, b) =
 const convNext = (v, e) => (v.convoques || {})[e.id] ?? (e.convoque !== false);
 const crEnts = v => { const pv = prevVisite(v); return intervenants().filter(e => e.convoque !== false || presOf(v, e.id) || (v.convoques || {})[e.id] || (pv && (pv.convoques || {})[e.id])); };
 function nextSeq(v) { const used = S.visites.flatMap(x => x.observations || []).filter(o => o.cr === v.numero).reduce((m, o) => Math.max(m, o.seq || 0), 0); v.qMax = Math.max(v.qMax || 0, used) + 1; return v.qMax; }
-function newObs(v, lotId = '', texte = '', photoIds = [], localisation = '') { return { id: DB.uid(), qid: DB.uid(), cr: v.numero, seq: nextSeq(v), lotId, localisation, texte, statut: 'afaire', echeance: '', photoIds, origine: null }; }
+/* chaque question a un émetteur (celui qui la pose, par défaut l'architecte) et un ou plusieurs destinataires (l'entreprise du lot par défaut, ou « tous ») */
+const qDestDefault = lotId => lotEnt(lotId) ? [lotEnt(lotId)] : ['TOUS'];
+const qDest = o => (o.destinataires && o.destinataires.length) ? o.destinataires : qDestDefault(o.lotId);
+const qEm = o => entById(o.emetteurId) || emetteurOf();
+const entShort = e => { if (!e) return ''; const l = e.role === 'ENT' ? lotsOf().filter(x => x.entrepriseId === e.id).map(x => x.code).join(', ') : ''; return e.nom + (l ? ' (lot ' + l + ')' : ''); };
+const qDestLabel = o => qDest(o).map(id => id === 'TOUS' ? 'Tous' : entShort(entById(id))).filter(Boolean).join(', ');
+const obsFromPhoto = (v, p) => Object.assign(newObs(v, p.lotId, phTxt(p), [p.id], phLoc(p)), (p.destinataires || []).length ? { destinataires: [...p.destinataires], destAuto: false } : {}, p.emetteurId ? { emetteurId: p.emetteurId } : {});
+function newObs(v, lotId = '', texte = '', photoIds = [], localisation = '') { return { id: DB.uid(), qid: DB.uid(), cr: v.numero, seq: nextSeq(v), lotId, localisation, texte, emetteurId: (emetteurOf() || {}).id || '', destinataires: qDestDefault(lotId), destAuto: true, statut: 'afaire', echeance: '', photoIds, origine: null }; }
 const carry = (o, from) => ({ ...o, id: DB.uid(), origine: o.cr || o.origine || from.numero, photoIds: [], photosCR: o.photoIds && o.photoIds.length ? (o.photosCR || from.numero) : o.photosCR || null });
 /* numérote les questions des CR créés avant la 0.4 (une question reprise garde le numéro de sa première apparition) */
 async function numberQuestions() {
@@ -299,7 +306,7 @@ async function injectPrev(v) {
   if (!add.length) return 0; v.observations = [...(v.observations || []), ...add]; await save('visites', v); return add.length;
 }
 async function visiteDuJour(create = true) { const v = S.visites.find(x => x.date === today()); return v || !create ? v : newVisite(today(), new Date().toTimeString().slice(0, 5)); }
-async function addObsFromPhoto(p) { const v = await visiteDuJour(); const o = newObs(v, p.lotId, phTxt(p), [p.id], phLoc(p)); v.observations.push(o); await save('visites', v); toast(`Question ${qNum(o)} ajoutée au ${crName(v.numero)}`); }
+async function addObsFromPhoto(p) { const v = await visiteDuJour(); const o = obsFromPhoto(v, p); v.observations.push(o); await save('visites', v); toast(`Question ${qNum(o)} ajoutée au ${crName(v.numero)}`); }
 function tabVisites(m) {
   m.innerHTML = `<div class="bar"><h2 class="grow" style="font-size:18px">Comptes-rendus</h2><button class="btn pri" id="bNv">+ Nouveau compte-rendu (${crName((S.visites[0] || { numero: 0 }).numero + 1)})</button></div>
     <div class="list">${S.visites.map(v => { const o = v.observations || [], n = s => o.filter(x => qSect(v, x) === s).length; return `<a class="card ch" href="#/c/${S.ch.id}/v/${v.id}"><span class="ico">${crName(v.numero)}</span><span class="grow"><b>${crName(v.numero)} · ${fmtDL(v.date)}</b><div class="small muted">${n('jour')} du jour, ${n('encours')} en cours, ${n('reglees')} réglée(s)${v.diffuseLe ? ' · diffusé le ' + fmtD(v.diffuseLe) : ''}</div></span></a>`; }).join('') || '<div class="empty"><b>Aucun compte-rendu</b>Créez le compte-rendu de la visite : les questions en cours sont reprises, les photos du jour vous sont proposées.</div>'}</div>`;
@@ -340,7 +347,11 @@ async function viewVisite(app, id) {
   $$('[data-o]', app).forEach(el => { const o = v.observations.find(x => x.id === el.dataset.o);
     el.querySelectorAll('[data-ok]').forEach(i => i.oninput = i.onchange = () => { o[i.dataset.ok] = i.value;
       if (i.dataset.ok === 'statut') { if (o.statut === 'fait') o.regleeAu = v.numero; else delete o.regleeAu; save('visites', v).then(render); return; }
-      if (i.dataset.ok === 'lotId') { save('visites', v).then(render); return; } persist(); });
+      if (i.dataset.ok === 'lotId') { if (o.destAuto !== false) o.destinataires = qDestDefault(o.lotId); save('visites', v).then(render); return; }
+      if (i.dataset.ok === 'emetteurId') { o.destinataires = qDest(o).filter(x => x !== o.emetteurId); save('visites', v).then(render); return; } persist(); });
+    el.querySelectorAll('[data-qd]').forEach(b => b.onclick = () => { const id = b.dataset.qd; let d = [...qDest(o)];
+      d = id === 'TOUS' ? ['TOUS'] : d.includes(id) ? d.filter(x => x !== id) : [...d.filter(x => x !== 'TOUS'), id];
+      o.destinataires = d.length ? d : ['TOUS']; o.destAuto = false; el.querySelectorAll('[data-qd]').forEach(x => x.classList.toggle('on', o.destinataires.includes(x.dataset.qd))); persist(); });
     el.querySelector('[data-act=ph]').onclick = async () => { const ids = await pickPhotos(o.photoIds || [], v.date); if (ids) { o.photoIds = ids; await save('visites', v); render(); } };
     el.querySelector('[data-act=cam]').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, lotId: o.lotId, texte: o.texte, localisation: o.localisation, silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; if (!o.localisation && phLoc(p)) o.localisation = phLoc(p); await save('visites', v); render(); }; inp.click(); };
     const mv = el.querySelector('[data-act=done]') || el.querySelector('[data-act=open]'); mv.onclick = async () => { if (o.statut === 'fait') { o.statut = 'afaire'; delete o.regleeAu; } else { o.statut = 'fait'; o.regleeAu = v.numero; } await save('visites', v); render(); };
@@ -351,14 +362,16 @@ async function viewVisite(app, id) {
   $('#bPrev').onclick = async () => { const prev = prevVisite(v); if (!prev) return toast('Pas de compte-rendu précédent');
     const have = new Set(v.observations.map(o => o.qid || qNum(o))), add = (prev.observations || []).filter(o => o.statut !== 'fait' && !have.has(o.qid || qNum(o))).map(o => carry(o, prev));
     if (!add.length) return toast('Aucune question en cours à reprendre'); v.observations.push(...add); await save('visites', v); toast(`${add.length} question(s) reprise(s) du ${crName(prev.numero)}`); render(); };
-  if ($('#dayPh')) $$('#dayPh [data-ph]', app).forEach(b => b.onclick = async () => { const p = photoById(b.dataset.ph); v.observations.push(newObs(v, p.lotId, phTxt(p), [p.id], phLoc(p))); await save('visites', v); render(); });
-  $('#fab').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, silent: true }); v.observations.push(newObs(v, p.lotId, phTxt(p), [p.id], phLoc(p))); await save('visites', v); render(); }; inp.click(); };
+  if ($('#dayPh')) $$('#dayPh [data-ph]', app).forEach(b => b.onclick = async () => { const p = photoById(b.dataset.ph); v.observations.push(obsFromPhoto(v, p)); await save('visites', v); render(); });
+  $('#fab').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, silent: true }); v.observations.push(obsFromPhoto(v, p)); await save('visites', v); render(); }; inp.click(); };
   $('#bPdf').onclick = () => exportCR(v);
   $('#bDelV').onclick = async () => { if (!confirm(`Supprimer le compte-rendu ${crName(v.numero)} ?`)) return; v.deleted = true; await save('visites', v); location.hash = `#/c/${S.ch.id}/visites`; };
 }
 function obsHTML(o, v) {
   const hist = [o.cr && o.cr < v.numero ? `posée au ${crName(o.cr)}` : '', o.photosCR && !(o.photoIds || []).length ? `photos au ${crName(o.photosCR)}` : ''].filter(Boolean).join(' · ');
   return `<div class="obs st-${o.statut}" data-o="${o.id}"><div class="row" style="gap:8px"><span class="qnum">${esc(qNum(o))}</span><input type="text" data-ok="localisation" list="dlLoc" value="${esc(o.localisation || '')}" placeholder="Localisation (pièce, niveau)" autocomplete="off" class="grow"></div><textarea data-ok="texte" rows="2" placeholder="Question, constat, demande">${esc(o.texte)}</textarea>
+    <div class="qwho"><label class="row small muted" style="gap:6px">De<select data-ok="emetteurId" style="width:auto;max-width:260px">${intervenants().map(e => `<option value="${e.id}"${qEm(o) && qEm(o).id === e.id ? ' selected' : ''}>${esc(entLabel(e))}</option>`).join('')}</select></label>
+      <span class="small muted">À</span><div class="levels wrap">${[['TOUS', 'Tous'], ...intervenants().filter(e => !qEm(o) || e.id !== qEm(o).id).map(e => [e.id, entShort(e)])].map(([id, t]) => `<button type="button" class="chip${qDest(o).includes(id) ? ' on' : ''}" data-qd="${id}">${esc(t)}</button>`).join('')}</div></div>
     <div class="row" style="flex-wrap:wrap"><select data-ok="statut" style="width:auto">${Object.entries(OBS_ST).map(([k, t]) => `<option value="${k}"${o.statut === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
     <label class="row small muted" style="gap:4px">Échéance <input type="date" data-ok="echeance" value="${o.echeance || ''}" style="width:auto"></label>
     <select data-ok="lotId" style="width:auto;max-width:200px">${lotOptions(o.lotId)}</select>${hist ? `<span class="small muted">${hist}</span>` : ''}</div>
