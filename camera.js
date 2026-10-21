@@ -21,7 +21,11 @@ function cameraSheet() {
       stop(); msg('Ouverture de la caméra…');
       const want = devs[di] ? { deviceId: { exact: devs[di].deviceId } } : { facingMode: { ideal: 'environment' } };
       try { stream = await navigator.mediaDevices.getUserMedia({ video: { ...want, width: { ideal: 4096 }, height: { ideal: 3072 } }, audio: false }); }
-      catch (e) { msg(''); $('.camwrap', sh.el).innerHTML = `<div class="empty" style="color:#fff"><b>Caméra inaccessible</b>${e.name === 'NotAllowedError' ? "Autorisez l'accès à la caméra pour cette application (icône à gauche de l'adresse, ou réglages du navigateur)." : esc(e.message || e.name)}<br><br>Vous pouvez aussi choisir une photo déjà prise (« Choisir un fichier »).</div>`; $('#cvShot', sh.el).disabled = true; return; }
+      catch (e) { msg(''); const n = (await navigator.mediaDevices.enumerateDevices().catch(() => [])).filter(d => d.kind === 'videoinput').length, linux = /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
+        const why = e.name === 'NotAllowedError' ? "L'accès à la caméra est refusé : autorisez-le pour cette application (icône à gauche de l'adresse, ou réglages du navigateur et du système)."
+          : e.name === 'NotFoundError' || !n ? 'Le navigateur ne voit aucune caméra.' + (linux ? " Sous Linux, les caméras des tablettes récentes (Intel IPU6, Surface…) passent par libcamera et PipeWire : dans Chromium ou Chrome, activez chrome://flags/#enable-webrtc-pipewire-camera puis relancez le navigateur ; vérifiez d'abord que l'application Caméra du système (Snapshot) fonctionne." : '')
+          : e.name === 'NotReadableError' ? 'La caméra est occupée par une autre application, ou son pilote ne répond pas : fermez les autres applications qui l\'utilisent, puis réessayez.' : esc(e.message || e.name);
+        $('.camwrap', sh.el).innerHTML = `<div class="empty" style="color:#fff;max-width:640px"><b>Caméra inaccessible</b>${why}<div class="small" style="opacity:.7;margin-top:8px">${esc(e.name)} · ${n} caméra(s) détectée(s)</div><br>Vous pouvez aussi choisir une photo déjà prise (« Choisir un fichier »).</div>`; $('#cvShot', sh.el).disabled = true; return; }
       v.srcObject = stream; await v.play().catch(() => {});
       const s = stream.getVideoTracks()[0].getSettings(); msg(`${s.width || v.videoWidth}×${s.height || v.videoHeight}`);
       if (!devs.length) { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); const cur = s.deviceId; di = Math.max(0, devs.findIndex(d => d.deviceId === cur)); }
