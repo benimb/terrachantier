@@ -16,3 +16,9 @@ Applications de la suite TerraSuite installables sur téléphone, tablette et PC
 Aucune donnée de chantier n'est stockée dans ce dépôt.
 
 Adresse : https://benimb.github.io/terrachantier/ (TerraContacts : https://benimb.github.io/terrachantier/contacts.html)
+
+## Installer sur une tablette ou un PC sous Linux
+1. Ouvrir https://benimb.github.io/terrachantier/ dans **Chromium**, **Google Chrome**, **Microsoft Edge** ou **Brave** (Firefox n'installe pas les applications web sous Linux).
+2. Bouton « Installer » de l'accueil de TerraChantier, ou menu du navigateur › « Installer TerraChantier » (Chrome : « Caster, enregistrer et partager › Installer la page en tant qu'application »).
+3. TerraChantier apparaît dans le menu des applications, s'ouvre en plein écran et fonctionne sans réseau.
+4. Première photo : autoriser l'accès à la caméra. La prise de vue est intégrée à l'application (caméra arrière par défaut, bouton « Changer de caméra »).

@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.5.2';
+const APP_VERSION = '0.6';
 /* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
@@ -135,7 +135,7 @@ async function tabPhotos(m) {
   $$('[data-ph]', m).forEach(b => b.onclick = () => photoSheet(photoById(b.dataset.ph)));
 }
 /* prise de vue : appareil photo du téléphone, puis texte, destinataire et localisation */
-function takePhoto(ctx) { const inp = $('#camIn'); inp.value = ''; inp.onchange = () => { if (inp.files[0]) processFiles([...inp.files], ctx); }; inp.click(); }
+function takePhoto(ctx) { shoot(files => processFiles(files, ctx)); } // appareil du système (téléphone) ou prise de vue intégrée (tablette Linux, PC) : camera.js
 function importPhotos(ctx = {}) { const inp = $('#galIn'); inp.value = ''; inp.onchange = () => { if (inp.files.length) processFiles([...inp.files], { ...ctx, bulk: inp.files.length > 1 }); }; inp.click(); }
 const defaultDest = lotId => lotEnt(lotId) ? [lotEnt(lotId)] : (S.lastDest || []).filter(id => entById(id));
 async function processFiles(files, ctx) {
@@ -356,7 +356,7 @@ async function viewVisite(app, id) {
       d = id === 'TOUS' ? ['TOUS'] : d.includes(id) ? d.filter(x => x !== id) : [...d.filter(x => x !== 'TOUS'), id];
       o.destinataires = d.length ? d : ['TOUS']; o.destAuto = false; o.lotId = qLot(o); el.querySelectorAll('[data-qd]').forEach(x => x.classList.toggle('on', o.destinataires.includes(x.dataset.qd))); persist(); });
     el.querySelector('[data-act=ph]').onclick = async () => { const ids = await pickPhotos(o.photoIds || [], v.date); if (ids) { o.photoIds = ids; await save('visites', v); render(); } };
-    el.querySelector('[data-act=cam]').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, lotId: qLot(o), texte: o.titre || o.texte, destinataires: qDest(o).includes('TOUS') ? undefined : qDest(o), silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; await save('visites', v); render(); }; inp.click(); };
+    el.querySelector('[data-act=cam]').onclick = () => { shoot(async files => { const [p] = await processFiles(files, { forObs: true, lotId: qLot(o), texte: o.titre || o.texte, destinataires: qDest(o).includes('TOUS') ? undefined : qDest(o), silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; await save('visites', v); render(); }); };
     const mv = el.querySelector('[data-act=done]') || el.querySelector('[data-act=open]'); mv.onclick = async () => { if (o.statut === 'fait') { o.statut = 'afaire'; delete o.regleeAu; } else { o.statut = 'fait'; o.regleeAu = v.numero; } await save('visites', v); render(); };
     el.querySelector('[data-act=del]').onclick = async () => { if (!confirm(`Supprimer la question ${qNum(o)} de ce compte-rendu ?`)) return; v.observations = v.observations.filter(x => x !== o); if (o.cr < v.numero) v.retires = [...(v.retires || []), o.qid || qNum(o)]; await save('visites', v); render(); };
     el.querySelector('[data-act=res]').onclick = async () => { const p = photoById((o.photoIds || [])[0]), r = await newReserve({ lotId: qLot(o), description: [o.titre, o.texte].filter(Boolean).join(' : '), localisation: (p && p.localisation) || o.localisation || '', photoIds: [...(o.photoIds || [])] }); if (p && p.planId) Object.assign(r, { planId: p.planId, x: p.x, y: p.y }); await save('reserves', r); toast(`Réserve n° ${r.numero} créée`); };
@@ -366,7 +366,7 @@ async function viewVisite(app, id) {
     const have = new Set(v.observations.map(o => o.qid || qNum(o))), add = (prev.observations || []).filter(o => o.statut !== 'fait' && !have.has(o.qid || qNum(o))).map(o => carry(o, prev));
     if (!add.length) return toast('Aucune question en cours à reprendre'); v.observations.push(...add); await save('visites', v); toast(`${add.length} question(s) reprise(s) du ${crName(prev.numero)}`); render(); };
   if ($('#dayPh')) $$('#dayPh [data-ph]', app).forEach(b => b.onclick = async () => { const p = photoById(b.dataset.ph); v.observations.push(obsFromPhoto(v, p)); await save('visites', v); render(); });
-  $('#fab').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, silent: true }); v.observations.push(obsFromPhoto(v, p)); await save('visites', v); render(); }; inp.click(); };
+  $('#fab').onclick = () => { shoot(async files => { const [p] = await processFiles(files, { forObs: true, silent: true }); v.observations.push(obsFromPhoto(v, p)); await save('visites', v); render(); }); };
   $('#bPdf').onclick = () => exportCR(v);
   $('#bDelV').onclick = async () => { if (!confirm(`Supprimer le compte-rendu ${crName(v.numero)} ?`)) return; v.deleted = true; await save('visites', v); location.hash = `#/c/${S.ch.id}/visites`; };
 }
@@ -433,7 +433,7 @@ async function viewReserve(app, id) {
   let tm; $$('[data-k]', app).forEach(i => i.oninput = i.onchange = () => { r[i.dataset.k] = i.value; if (i.dataset.k === 'statut' && r.statut === 'levee' && !r.dateLevee) { r.dateLevee = today(); $('[data-k=dateLevee]', app).value = r.dateLevee; } clearTimeout(tm); tm = setTimeout(() => save('reserves', r), 400); });
   if (plan) { const pv = new PlanView($('#rPv'), {}); await pv.load(plan); pv.setMarkers([{ x: r.x, y: r.y, kind: 'res', label: r.numero }]); pv.center(r.x, r.y, Math.max(pv.s * 3, .25)); }
   $('#rLoc').onclick = () => placeOnPlan(r.planId || S.lastPlan, r.planId ? { x: r.x, y: r.y } : null, `Réserve n° ${r.numero}`).then(async loc => { if (!loc) return; Object.assign(r, loc); await save('reserves', r); render(); });
-  const addCam = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forReserve: true, lotId: r.lotId, silent: true }); r.photoIds = [...(r.photoIds || []), p.id]; if (!r.planId && p.planId) Object.assign(r, { planId: p.planId, x: p.x, y: p.y }); await save('reserves', r); render(); }; inp.click(); };
+  const addCam = () => { shoot(async files => { const [p] = await processFiles(files, { forReserve: true, lotId: r.lotId, silent: true }); r.photoIds = [...(r.photoIds || []), p.id]; if (!r.planId && p.planId) Object.assign(r, { planId: p.planId, x: p.x, y: p.y }); await save('reserves', r); render(); }); };
   $('#rCam').onclick = addCam; $('#fab').onclick = addCam;
   $('#rPick').onclick = async () => { const ids = await pickPhotos(r.photoIds || [], null); if (ids) { r.photoIds = ids; await save('reserves', r); render(); } };
   $('#rDel').onclick = async () => { if (!confirm(`Supprimer la réserve n° ${r.numero} ?`)) return; r.deleted = true; await save('reserves', r); location.hash = `#/c/${S.ch.id}/reserves`; };
@@ -553,6 +553,7 @@ function tabFiche(m) {
 async function settingsSheet() {
   const cfg = await Sync.config(), est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
   const sh = sheet('Réglages', `<label class="f">Votre nom sur cet appareil (rédacteur des comptes-rendus)<input type="text" id="sAut" value="${esc(S.auteur)}"></label>
+    <label class="f">Appareil photo<select id="sCam"><option value="auto"${(S.camMode || 'auto') === 'auto' ? ' selected' : ''}>Automatique : celui du téléphone, sinon prise de vue intégrée (tablette Linux, PC)</option><option value="integre"${S.camMode === 'integre' ? ' selected' : ''}>Prise de vue intégrée à l'application</option><option value="systeme"${S.camMode === 'systeme' ? ' selected' : ''}>Appareil ou sélecteur du système</option></select></label>
     <label class="f">Affichage<select id="sMode"><option value="auto"${S.mode === 'auto' ? ' selected' : ''}>Automatique : mode terrain sur téléphone, version complète sur PC et tablette</option><option value="terrain"${S.mode === 'terrain' ? ' selected' : ''}>Mode terrain (photos, CR, réserves)</option><option value="complet"${S.mode === 'complet' ? ' selected' : ''}>Version complète (tout faire, y compris la préparation)</option></select></label>
     <div class="card"><b>Votre agence</b><div class="hint" style="margin:4px 0 8px">Nom et logo en tête des comptes-rendus et des listes de réserves.</div>
       <div class="row" style="flex-wrap:wrap;gap:10px"><img id="sLogo" alt="" style="max-height:52px;max-width:180px;display:none;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px"><span class="grow small" id="sAg">${Carnet.agence() ? esc(Carnet.agence().nom) : 'Agence non renseignée'}</span>
@@ -561,6 +562,7 @@ async function settingsSheet() {
     <div class="card"><b>Sauvegarde</b><div class="hint" style="margin:4px 0 8px">Fichier de sauvegarde complet de cet appareil (chantiers, plans, photos).${est ? ` Espace utilisé : ${(est.usage / 1048576).toFixed(0)} Mo.` : ''}</div><div class="row" style="flex-wrap:wrap"><button class="btn" id="sExp">Enregistrer une sauvegarde</button><button class="btn" id="sImp">Restaurer une sauvegarde</button></div></div>
     <div class="small muted">TerraChantier ${APP_VERSION} bêta · TerraSuite${Carnet.agence() ? ' · ' + esc(Carnet.agence().nom) : ''} · <a href="contacts.html#/agence">Mon agence</a></div>`, `<button class="btn pri" data-close>Fermer</button>`);
   $('#sAut', sh.el).onchange = e => { S.auteur = e.target.value.trim(); DB.meta('auteur', S.auteur); };
+  $('#sCam', sh.el).onchange = e => { S.camMode = e.target.value; DB.meta('camMode', S.camMode); };
   $('#sMode', sh.el).onchange = e => { S.mode = e.target.value; DB.meta('mode', S.mode); render(); };
   Sync.bindForm(sh.el);
   const ag0 = Carnet.agence(); if (ag0 && ag0.logoId) BlobURL(ag0.logoId).then(u => { if (u) { $('#sLogo', sh.el).src = u; $('#sLogo', sh.el).style.display = 'block'; } });
@@ -586,7 +588,7 @@ async function backupImport(file) {
 
 /* ================= Démarrage ================= */
 (async function init() {
-  S.auteur = (await DB.meta('auteur')) || ''; S.mode = (await DB.meta('mode')) || 'auto'; S.lastPlan = await DB.meta('lastPlan');
+  S.auteur = (await DB.meta('auteur')) || ''; S.mode = (await DB.meta('mode')) || 'auto'; S.camMode = (await DB.meta('camMode')) || 'auto'; S.lastPlan = await DB.meta('lastPlan');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   registerSW(); await Carnet.load();
   await render(); Sync.start();
