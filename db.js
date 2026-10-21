@@ -1,8 +1,8 @@
-/* TerraChantier : base locale (IndexedDB).
+/* TerraSuite en ligne (TerraChantier, TerraContacts) : base locale (IndexedDB), commune aux deux applications.
    Chaque fiche porte un identifiant unique, sa date de mise à jour et un drapeau « à synchroniser ».
    Une suppression est un marquage (deleted), pour qu'elle se propage aux autres appareils. */
 const DB = (() => {
-  const NAME = 'terrachantier', VER = 1, STORES = ['chantiers', 'plans', 'photos', 'visites', 'reserves'];
+  const NAME = 'terrachantier', VER = 2, STORES = ['chantiers', 'plans', 'photos', 'visites', 'reserves', 'contacts']; // « contacts » : carnet TerraContacts (v2)
   let dbp = null;
   const open = () => dbp || (dbp = new Promise((ok, ko) => {
     const r = indexedDB.open(NAME, VER);

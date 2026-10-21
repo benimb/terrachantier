@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TerraContacts</title>
+<meta name="description" content="Carnet de contacts de TerraSuite : maîtres d'ouvrage, bureaux d'études, entreprises, et fiche de l'agence">
+<meta name="theme-color" content="#7a4fb0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app"></div>
+<input type="file" id="impIn" accept=".xlsx,.xls,.csv,.vcf,.json,text/csv,text/vcard,application/json" hidden>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="common.js"></script>
+<script src="db.js"></script>
+<script src="plan.js"></script>
+<script src="sync.js"></script>
+<script src="carnet.js"></script>
+<script src="contacts-app.js"></script>
+</body>
+</html>

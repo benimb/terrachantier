@@ -1,20 +1,6 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.2';
-const $ = (q, el = document) => el.querySelector(q), $$ = (q, el = document) => [...el.querySelectorAll(q)];
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
-const dayOf = iso => { if (!iso) return ''; const d = new Date(iso); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
-const fmtD = d => d ? new Date(d.length === 10 ? d + 'T12:00' : d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-const fmtDL = d => d ? new Date(d.length === 10 ? d + 'T12:00' : d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
-const fmtT = d => d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-const ICON = {
-  back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>', cam: '<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
-  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
-  x: '<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>', img: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
-};
-const DEFAULT_LOTS = [['00', 'Généralités'], ['01', 'Démolition, désamiantage'], ['02', 'Gros œuvre, maçonnerie'], ['03', 'Charpente, couverture'], ['04', 'Étanchéité'], ['05', 'Menuiseries extérieures'], ['06', 'Serrurerie, métallerie'], ['07', 'Plâtrerie, cloisons, faux plafonds'], ['08', 'Menuiseries intérieures'], ['09', 'Revêtements de sols et murs'], ['10', 'Peinture'], ['11', 'Électricité courants forts et faibles'], ['12', 'Plomberie, sanitaires'], ['13', 'Chauffage, ventilation, climatisation'], ['14', 'Ascenseurs'], ['15', 'VRD, espaces verts']];
-const ROLES = [['MOA', "Maître d'ouvrage"], ['AMO', "Assistance à maîtrise d'ouvrage"], ['MOE', "Maîtrise d'œuvre"], ['BET', "Bureau d'études"], ['BCT', 'Bureau de contrôle'], ['CSPS', 'Coordination SPS'], ['OPC', 'OPC'], ['ENT', 'Entreprise'], ['USR', 'Utilisateur, exploitant'], ['CONC', 'Concessionnaire'], ['AUT', 'Autre']];
-const roleName = k => (ROLES.find(r => r[0] === k) || ROLES[ROLES.length - 1])[1], roleRank = k => { const i = ROLES.findIndex(r => r[0] === k); return i < 0 ? 99 : i; };
+const APP_VERSION = '0.3';
+/* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
 const isField = () => S.mode === 'terrain' || (S.mode !== 'complet' && matchMedia('(max-width: 700px)').matches);
@@ -26,15 +12,6 @@ const S = { mode: 'auto', ch: null, plans: [], photos: [], visites: [], reserves
 let installEvt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!location.hash || location.hash === '#/') render(); });
 
-function toast(msg, ms = 2600) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
-function sheet(title, body, foot = '', { wide } = {}) {
-  const bg = document.createElement('div'); bg.className = 'sheet-bg';
-  bg.innerHTML = `<div class="sheet"${wide ? ' style="max-width:1100px"' : ''} role="dialog" aria-modal="true"><header><h2>${esc(title)}</h2><button class="icon-btn" data-close aria-label="Fermer">${ICON.x}</button></header><div class="body">${body}</div>${foot ? `<footer>${foot}</footer>` : ''}</div>`;
-  document.body.appendChild(bg); document.body.style.overflow = 'hidden';
-  const close = () => { bg.remove(); if (!$('.sheet-bg')) document.body.style.overflow = ''; bg.dispatchEvent(new Event('closed')); };
-  bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-close]')) close(); });
-  return { el: bg.querySelector('.sheet'), bg, close };
-}
 const lotsOf = () => (S.ch && S.ch.lots) || [];
 const lotById = id => lotsOf().find(l => l.id === id);
 const entById = id => ((S.ch && S.ch.entreprises) || []).find(e => e.id === id);
@@ -42,12 +19,22 @@ const lotLabel = id => { const l = lotById(id); return l ? `${l.code} ${l.nom}` 
 const lotOptions = (sel, blank = 'Sans lot') => `<option value="">${blank}</option>` + lotsOf().slice().sort((a, b) => a.code.localeCompare(b.code)).map(l => `<option value="${l.id}"${l.id === sel ? ' selected' : ''}>${esc(l.code)} ${esc(l.nom)}${l.entrepriseId && entById(l.entrepriseId) ? ' · ' + esc(entById(l.entrepriseId).nom) : ''}</option>`).join('');
 const planById = id => S.plans.find(p => p.id === id);
 const photoById = id => S.photos.find(p => p.id === id);
+/* photo : texte, localisation (pièce ou repère, plus le niveau du plan), destinataire(s) parmi les intervenants, émetteur (par défaut l'architecte du chantier) */
+const phTxt = p => (p.texte ?? p.legende) || '';
+const phLoc = p => { const pl = planById(p.planId), l = (p.localisation || '').trim(); return [l, pl && !norm(l).includes(norm(pl.nom)) ? pl.nom : ''].filter(Boolean).join(' · '); };
+const entLabel = e => e ? e.nom + (e.contact ? ' (' + e.contact + ')' : '') : '';
+const emetteurOf = o => entById(o && o.emetteurId) || entById(S.ch && S.ch.emetteurId) || intervenants().find(e => e.role === 'MOE') || null;
+const phDest = p => (p.destinataires || []).map(entById).filter(Boolean);
+const phTodo = p => !phTxt(p).trim() || !phDest(p).length;
+const lotEnt = lotId => { const l = lotById(lotId); return l && l.entrepriseId && entById(l.entrepriseId) ? l.entrepriseId : ''; };
+const locList = () => [...new Set([...S.photos.map(p => p.localisation), ...S.reserves.map(r => r.localisation)].filter(Boolean).map(s => s.trim()))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
 
 async function loadChantier(id) {
   if (S.ch && S.ch.id === id && S._fresh) return;
   S.ch = await DB.get('chantiers', id); if (!S.ch || S.ch.deleted) { S.ch = null; return; }
   [S.plans, S.photos, S.visites, S.reserves] = await Promise.all(['plans', 'photos', 'visites', 'reserves'].map(s => DB.all(s, id)));
   S.plans.sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0)); S.photos.sort((a, b) => (b.date || '').localeCompare(a.date || '')); S.visites.sort((a, b) => b.numero - a.numero); S.reserves.sort((a, b) => a.numero - b.numero);
+  if (Carnet.refreshChantier(S.ch)) await save('chantiers', S.ch); // coordonnées à jour depuis le carnet, émetteur par défaut
   S._fresh = true;
 }
 async function save(store, o) { await DB.put(store, o); const arr = { photos: S.photos, plans: S.plans, visites: S.visites, reserves: S.reserves }[store]; if (arr) { const i = arr.findIndex(x => x.id === o.id); if (o.deleted) { if (i >= 0) arr.splice(i, 1); } else if (i >= 0) arr[i] = o; else arr.unshift(o); } if (store === 'chantiers' && S.ch && S.ch.id === o.id) S.ch = o; Sync.soon(); return o; }
@@ -76,7 +63,8 @@ async function viewHome(app) {
   app.innerHTML = topBar('<span class="brand">Terra<b>Chantier</b></span> <span class="ver">v' + APP_VERSION + ' bêta</span>', 'Comptes-rendus, OPR, photos sur plan') + `<main>
     ${!standalone && installEvt ? `<div class="install"><div class="grow"><b>Installer TerraChantier</b><div class="small muted">Icône sur l'écran d'accueil, plein écran, fonctionne sans réseau.</div></div><button class="btn pri" id="bInst">Installer</button></div>` : ''}
     ${!standalone && ios ? `<div class="install"><div class="grow"><b>Installer sur l'iPhone</b><div class="small muted">Dans Safari : bouton Partager, puis « Sur l'écran d'accueil ».</div></div></div>` : ''}
-    <div class="bar"><h2 class="grow" style="font-size:20px">Chantiers</h2>${isField() ? '' : '<button class="btn pri" id="bNew">+ Nouveau chantier</button>'}</div>
+    ${!isField() && !Carnet.agence() ? `<div class="install"><div class="grow"><b>Renseignez votre agence</b><div class="small muted">Nom, coordonnées, logo et architecte par défaut : ils signent les comptes-rendus et les photos. À faire une fois dans TerraContacts.</div></div><a class="btn pri" href="contacts.html#/agence">Mon agence</a></div>` : ''}
+    <div class="bar"><h2 class="grow" style="font-size:20px">Chantiers</h2><a class="btn" href="contacts.html">Contacts</a>${isField() ? '' : '<button class="btn pri" id="bNew">+ Nouveau chantier</button>'}</div>
     ${isField() ? `<div class="hint" style="margin-bottom:10px">Mode terrain : les chantiers, plans et intervenants se préparent dans la version complète (PC ou tablette) et arrivent ici par la synchronisation.${list.length ? '' : ' <a href="#" id="lSet">Régler la synchronisation</a>'}</div>` : ''}
     <div class="list">${list.map(c => `<a class="card ch" href="#/c/${c.id}"><span class="ico">${esc((c.code || c.nom || '?').slice(0, 3).toUpperCase())}</span><span class="grow"><b>${esc(c.nom)}</b><div class="small muted">${esc([c.adresse, c.moa].filter(Boolean).join(' · '))}</div></span></a>`).join('') || (isField() ? '<div class="empty"><b>Aucun chantier sur ce téléphone</b>Créez le chantier sur le PC, puis connectez les deux appareils à la synchronisation (Réglages).</div>' : '<div class="empty"><b>Aucun chantier</b>Créez votre premier chantier, puis importez ses plans de niveaux.</div>')}</div></main>`;
   bindTop(app);
@@ -84,20 +72,29 @@ async function viewHome(app) {
   if ($('#bInst')) $('#bInst').onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; render(); };
 }
 function editChantier(c) {
-  const isNew = !c; c = c || { nom: '', code: '', adresse: '', moa: '', moe: 'TERRAFORM', lots: [], entreprises: [] };
+  const isNew = !c, ag = Carnet.agence(); c = c || { nom: '', code: '', adresse: '', moa: '', moe: ag ? ag.nom : '', lots: [], entreprises: [] };
+  let moaPick = null; // maître d'ouvrage choisi dans le carnet
   const sh = sheet(isNew ? 'Nouveau chantier' : 'Chantier', `<div class="grid2">
     <label class="f">Nom de l'opération<input type="text" id="cNom" value="${esc(c.nom)}" placeholder="Réhabilitation de…"></label>
     <label class="f">Code court<input type="text" id="cCode" value="${esc(c.code)}" maxlength="6" placeholder="CTN"></label>
     <label class="f">Adresse<input type="text" id="cAdr" value="${esc(c.adresse)}"></label>
-    <label class="f">Maître d'ouvrage<input type="text" id="cMoa" value="${esc(c.moa)}"></label>
+    <label class="f">Maître d'ouvrage<span class="row" style="gap:6px"><input type="text" id="cMoa" value="${esc(c.moa)}">${isNew ? '<button type="button" class="btn sm" id="cMoaK">Carnet</button>' : ''}</span></label>
     <label class="f">Maître d'œuvre<input type="text" id="cMoe" value="${esc(c.moe)}"></label></div>
+    ${isNew && ag ? `<div class="hint">Émetteur des comptes-rendus et des photos : ${esc(ag.nom)}${Carnet.architecte() ? ', ' + esc(Carnet.fullName(Carnet.architecte())) : ''} (modifiable dans « Intervenants et lots »).</div>` : ''}
     ${isNew ? '<label class="row small"><input type="checkbox" id="cLots" checked> Créer la liste de lots habituelle (modifiable ensuite)</label>' : ''}`,
     `${!isNew ? '<button class="btn danger" id="cDel">Supprimer</button><span class="grow"></span>' : ''}<button class="btn" data-close>Annuler</button><button class="btn pri" id="cOk">Enregistrer</button>`);
   $('#cNom', sh.el).focus();
+  if ($('#cMoaK', sh.el)) $('#cMoaK', sh.el).onclick = async () => { const k = await Carnet.pick({ role: 'MOA', title: "Maître d'ouvrage" }); if (k) { moaPick = k; $('#cMoa', sh.el).value = k.c.nom; } };
   $('#cOk', sh.el).onclick = async () => {
     const nom = $('#cNom', sh.el).value.trim(); if (!nom) return toast('Donnez un nom au chantier');
     Object.assign(c, { nom, code: $('#cCode', sh.el).value.trim(), adresse: $('#cAdr', sh.el).value.trim(), moa: $('#cMoa', sh.el).value.trim(), moe: $('#cMoe', sh.el).value.trim() });
-    if (isNew) { c.id = DB.uid(); c.chantierId = c.id; c.entreprises = [c.moa && { id: DB.uid(), role: 'MOA', nom: c.moa, contact: '', fonction: '', tel: '', email: '', convoque: true }, c.moe && { id: DB.uid(), role: 'MOE', nom: c.moe, contact: S.auteur, fonction: '', tel: '', email: '', convoque: true }].filter(Boolean); if ($('#cLots', sh.el).checked) c.lots = DEFAULT_LOTS.map(([code, nom]) => ({ id: DB.uid(), code, nom, entrepriseId: '' })); }
+    if (isNew) {
+      c.id = DB.uid(); c.chantierId = c.id;
+      const moa = !c.moa ? null : moaPick && moaPick.c.nom === c.moa ? Carnet.asIntervenant(moaPick.c, moaPick.pid, { id: DB.uid(), role: 'MOA', convoque: true }) : { id: DB.uid(), role: 'MOA', nom: c.moa, contact: '', fonction: '', tel: '', email: '', convoque: true };
+      const moe = !c.moe ? null : ag && norm(ag.nom) === norm(c.moe) ? Carnet.asIntervenant(ag, '', { id: DB.uid(), role: 'MOE', convoque: true }) : { id: DB.uid(), role: 'MOE', nom: c.moe, contact: S.auteur, fonction: '', tel: '', email: '', convoque: true };
+      c.entreprises = [moa, moe].filter(Boolean); c.emetteurId = moe ? moe.id : '';
+      if ($('#cLots', sh.el).checked) c.lots = DEFAULT_LOTS.map(([code, nom]) => ({ id: DB.uid(), code, nom, entrepriseId: '' }));
+    }
     await save('chantiers', c); sh.close(); if (isNew) location.hash = `#/c/${c.id}/plans`; else render();
   };
   if ($('#cDel', sh.el)) $('#cDel', sh.el).onclick = async () => { if (!confirm(`Supprimer le chantier « ${c.nom} » et toutes ses données sur cet appareil ?`)) return; c.deleted = true; await save('chantiers', c); sh.close(); location.hash = '#/'; };
@@ -105,9 +102,9 @@ function editChantier(c) {
 
 /* ================= Chantier ================= */
 function viewChantier(app, tab) {
-  const c = S.ch, nP = S.photos.filter(p => !p.planId).length, nR = S.reserves.filter(r => r.statut === 'ouverte').length;
+  const c = S.ch, nP = S.photos.filter(p => !p.planId || phTodo(p)).length, nR = S.reserves.filter(r => r.statut === 'ouverte').length;
   app.innerHTML = topBar(esc(c.nom), [c.adresse, c.moa].filter(Boolean).join(' · '), { back: '#/' }) +
-    `<nav class="tabs">${[['photos', 'Photos' + (nP ? ` (${nP} à localiser)` : '')], ['visites', 'Comptes-rendus'], ['reserves', 'Réserves' + (nR ? ` (${nR})` : '')], ['plans', 'Plans'], ['fiche', isField() ? 'Intervenants' : 'Intervenants et lots']].map(([k, t]) => `<a href="#/c/${c.id}/${k}" class="${k === tab ? 'on' : ''}">${t}</a>`).join('')}</nav><main id="main"></main>
+    `<nav class="tabs">${[['photos', 'Photos' + (nP ? ` (${nP} à compléter)` : '')], ['visites', 'Comptes-rendus'], ['reserves', 'Réserves' + (nR ? ` (${nR})` : '')], ['plans', 'Plans'], ['fiche', isField() ? 'Intervenants' : 'Intervenants et lots']].map(([k, t]) => `<a href="#/c/${c.id}/${k}" class="${k === tab ? 'on' : ''}">${t}</a>`).join('')}</nav><main id="main"></main>
     <button class="fab" id="fab" aria-label="Prendre une photo">${ICON.cam}</button>`;
   bindTop(app); $('#fab').onclick = () => takePhoto({});
   const m = $('#main');
@@ -117,52 +114,86 @@ function viewChantier(app, tab) {
 /* ---------- Photos ---------- */
 async function thumbsHTML(list, { sel, pick } = {}) {
   const urls = await Promise.all(list.map(p => BlobURL(p.thumbId || p.blobId)));
-  return list.map((p, i) => `<button type="button" class="th${sel && sel.has(p.id) ? ' sel' : ''}" data-ph="${p.id}" title="${esc(p.legende || '')}"><img src="${urls[i]}" alt="${esc(p.legende || 'Photo')}" loading="lazy">${!p.planId ? '<span class="tag warn">à localiser</span>' : `<span class="tag">${esc((planById(p.planId) || {}).nom || '')}</span>`}${pick ? `<span class="ck">${sel && sel.has(p.id) ? '✓' : ''}</span>` : ''}</button>`).join('');
+  return list.map((p, i) => { const tag = phTodo(p) ? '<span class="tag warn">à compléter</span>' : !p.planId ? '<span class="tag warn">à localiser</span>' : `<span class="tag">${esc(phLoc(p))}</span>`;
+    return `<button type="button" class="th${sel && sel.has(p.id) ? ' sel' : ''}" data-ph="${p.id}" title="${esc([phLoc(p), phTxt(p), phDest(p).length ? 'À : ' + phDest(p).map(e => e.nom).join(', ') : ''].filter(Boolean).join('\n'))}"><img src="${urls[i]}" alt="${esc(phTxt(p) || 'Photo')}" loading="lazy">${tag}${pick ? `<span class="ck">${sel && sel.has(p.id) ? '✓' : ''}</span>` : ''}</button>`; }).join('');
 }
 async function tabPhotos(m) {
-  const flt = S._phF || 'all', list = S.photos.filter(p => flt === 'all' || (flt === 'loc' ? !p.planId : p.planId === flt));
+  const flt = S._phF || 'all', dst = S._phD || '', todo = p => phTodo(p) || !p.planId;
+  const list = S.photos.filter(p => (flt === 'all' || (flt === 'todo' ? todo(p) : p.planId === flt)) && (!dst || (p.destinataires || []).includes(dst)));
   const byDay = new Map(); for (const p of list) { const d = dayOf(p.date); if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(p); }
-  m.innerHTML = `<div class="bar"><button class="btn pri" id="bCam">${ICON.cam.replace('<svg', '<svg width="18" height="18" style="fill:none;stroke:currentColor;stroke-width:2"')} Prendre une photo</button><button class="btn" id="bGal">Importer des photos</button><span class="grow"></span></div>
-    <div class="levels bar"><button class="chip${flt === 'all' ? ' on' : ''}" data-f="all">Toutes (${S.photos.length})</button><button class="chip${flt === 'loc' ? ' on' : ''}" data-f="loc">À localiser (${S.photos.filter(p => !p.planId).length})</button>${S.plans.map(p => `<button class="chip${flt === p.id ? ' on' : ''}" data-f="${p.id}">${esc(p.nom)}</button>`).join('')}</div>
-    <div id="days">${list.length ? '' : '<div class="empty"><b>Aucune photo</b>Le bouton appareil photo, en bas à droite, prend une photo et la place sur le plan du niveau.</div>'}</div>`;
-  $('#bCam').onclick = () => takePhoto({}); $('#bGal').onclick = () => importPhotos();
+  const dests = intervenants().filter(e => S.photos.some(p => (p.destinataires || []).includes(e.id)));
+  m.innerHTML = `<div class="bar"><button class="btn pri" id="bCam">${ICON.cam.replace('<svg', '<svg width="18" height="18" style="fill:none;stroke:currentColor;stroke-width:2"')} Prendre une photo</button><button class="btn" id="bGal">Importer des photos</button><span class="grow"></span><button class="btn" id="bPhPdf"${list.length ? '' : ' disabled'}>PDF par destinataire</button></div>
+    <div class="levels bar"><button class="chip${flt === 'all' ? ' on' : ''}" data-f="all">Toutes (${S.photos.length})</button><button class="chip${flt === 'todo' ? ' on' : ''}" data-f="todo">À compléter (${S.photos.filter(todo).length})</button>${S.plans.map(p => `<button class="chip${flt === p.id ? ' on' : ''}" data-f="${p.id}">${esc(p.nom)}</button>`).join('')}</div>
+    ${dests.length ? `<div class="bar"><select id="fDst" style="width:auto;max-width:320px"><option value="">Tous les destinataires</option>${dests.map(e => `<option value="${e.id}"${dst === e.id ? ' selected' : ''}>${esc(entLabel(e))}</option>`).join('')}</select><span class="small muted">${list.length} photo(s)</span></div>` : ''}
+    <div id="days">${list.length ? '' : '<div class="empty"><b>Aucune photo</b>Le bouton appareil photo, en bas à droite, prend une photo : texte, localisation, destinataire, puis place sur le plan du niveau.</div>'}</div>`;
+  $('#bCam').onclick = () => takePhoto({}); $('#bGal').onclick = () => importPhotos(); $('#bPhPdf').onclick = () => exportPhotos(list);
   $$('[data-f]', m).forEach(b => b.onclick = () => { S._phF = b.dataset.f; tabPhotos(m); });
+  if ($('#fDst', m)) $('#fDst', m).onchange = e => { S._phD = e.target.value; tabPhotos(m); };
   let h = ''; for (const [d, ps] of byDay) h += `<div class="day">${fmtDL(d)} · ${ps.length}</div><div class="thumbs">${await thumbsHTML(ps)}</div>`;
   if (list.length) $('#days', m).innerHTML = h;
   $$('[data-ph]', m).forEach(b => b.onclick = () => photoSheet(photoById(b.dataset.ph)));
 }
-/* prise de vue : appareil photo du téléphone, puis localisation sur le plan */
+/* prise de vue : appareil photo du téléphone, puis texte, destinataire et localisation */
 function takePhoto(ctx) { const inp = $('#camIn'); inp.value = ''; inp.onchange = () => { if (inp.files[0]) processFiles([...inp.files], ctx); }; inp.click(); }
 function importPhotos(ctx = {}) { const inp = $('#galIn'); inp.value = ''; inp.onchange = () => { if (inp.files.length) processFiles([...inp.files], { ...ctx, bulk: inp.files.length > 1 }); }; inp.click(); }
+const defaultDest = lotId => lotEnt(lotId) ? [lotEnt(lotId)] : (S.lastDest || []).filter(id => entById(id));
 async function processFiles(files, ctx) {
   const made = [];
   for (const [i, f] of files.entries()) {
     if (files.length > 1) toast(`Photo ${i + 1} sur ${files.length}…`, 1200);
     const [ex, im] = await Promise.all([readExif(f), shrinkImage(f)]);
     const blobId = await DB.putBlob(im.blob), thumbId = await DB.putBlob(im.thumb);
-    const p = { id: DB.uid(), chantierId: S.ch.id, blobId, thumbId, w: im.w, h: im.h, date: ex.date || (ctx.bulk ? new Date(f.lastModified).toISOString() : new Date().toISOString()), gps: ex.lat ? { lat: ex.lat, lon: ex.lon, alt: ex.alt } : null, compass: ex.dir ?? null, legende: '', lotId: ctx.lotId || '', planId: null, x: null, y: null, dir: null, auteur: S.auteur };
+    const p = { id: DB.uid(), chantierId: S.ch.id, blobId, thumbId, w: im.w, h: im.h, date: ex.date || (ctx.bulk ? new Date(f.lastModified).toISOString() : new Date().toISOString()), gps: ex.lat ? { lat: ex.lat, lon: ex.lon, alt: ex.alt } : null, compass: ex.dir ?? null,
+      texte: ctx.texte || '', localisation: ctx.localisation || '', lotId: ctx.lotId || '', destinataires: ctx.destinataires ? [...ctx.destinataires] : (ctx.bulk ? [] : defaultDest(ctx.lotId)), emetteurId: (emetteurOf() || {}).id || '', planId: null, x: null, y: null, dir: null, auteur: S.auteur };
     await save('photos', p); made.push(p);
   }
-  if (ctx.bulk) { toast(`${made.length} photo(s) importée(s), datées d'après l'appareil. Localisez-les depuis l'onglet Photos.`, 4000); render(); return made; }
+  if (ctx.bulk) { toast(`${made.length} photo(s) importée(s), datées d'après l'appareil. Complétez-les depuis l'onglet Photos (« À compléter »).`, 4500); render(); return made; }
   for (const p of made) await locateSheet(p, ctx);
   return made;
 }
-/* fenêtre de localisation : niveau, toucher l'emplacement, puis (facultatif) le point visé */
+/* champs d'une photo : texte, localisation, lot, destinataire(s), émetteur */
+function phFieldsHTML(p) {
+  const L = intervenants(), em = emetteurOf(p);
+  return `<label class="f">Texte<textarea id="fTx" rows="3" placeholder="Constat, demande, consigne à transmettre…">${esc(phTxt(p))}</textarea></label>
+    <div class="grid2"><label class="f">Localisation (pièce, repère)<input type="text" id="fLoc" list="dlLoc" value="${esc(p.localisation || '')}" placeholder="Chambre 3" autocomplete="off"></label><label class="f">Lot<select id="fLot">${lotOptions(p.lotId)}</select></label></div>
+    <datalist id="dlLoc">${locList().map(l => `<option value="${esc(l)}">`).join('')}</datalist>
+    <div class="f"><span>Destinataire${(p.destinataires || []).length > 1 ? 's' : '(s)'}</span><div class="levels wrap" id="fDest">${L.filter(e => !em || e.id !== em.id).map(e => `<button type="button" class="chip${(p.destinataires || []).includes(e.id) ? ' on' : ''}" data-dst="${e.id}" title="${esc(roleName(e.role) + (e.contact ? ' · ' + e.contact : ''))}">${esc(e.nom || '?')}${e.role !== 'ENT' ? ` <small>${esc(e.role)}</small>` : ''}</button>`).join('')}<button type="button" class="chip" id="fDstK">+ Carnet</button></div></div>
+    <label class="row small muted" style="gap:6px">De :<select id="fEm" style="width:auto;max-width:100%">${L.map(e => `<option value="${e.id}"${em && em.id === e.id ? ' selected' : ''}>${esc(entLabel(e))}</option>`).join('')}${em ? '' : '<option value="" selected>(émetteur à choisir)</option>'}</select></label>`;
+}
+function bindPhFields(el, p) {
+  let dest = [...(p.destinataires || [])], touched = dest.length > 0;
+  const paint = () => $$('[data-dst]', el).forEach(b => b.classList.toggle('on', dest.includes(b.dataset.dst)));
+  const bindChips = () => $$('[data-dst]', el).forEach(b => b.onclick = () => { const id = b.dataset.dst; dest = dest.includes(id) ? dest.filter(x => x !== id) : [...dest, id]; touched = true; $('#fDest', el).classList.remove('need'); paint(); });
+  bindChips();
+  $('#fLot', el).onchange = () => { if (!touched) { dest = defaultDest($('#fLot', el).value); paint(); } };
+  $('#fDstK', el).onclick = async () => { const k = await Carnet.pick({ title: 'Destinataire' }); if (!k) return; let e = intervenants().find(x => x.contactId === k.c.id && (!k.pid || x.personneId === k.pid));
+    if (!e) { e = Carnet.asIntervenant(k.c, k.pid, { id: DB.uid(), convoque: false }); S.ch.entreprises.push(e); await save('chantiers', S.ch); $('#fDstK', el).insertAdjacentHTML('beforebegin', `<button type="button" class="chip" data-dst="${e.id}">${esc(e.nom)}</button>`); bindChips(); }
+    if (!dest.includes(e.id)) dest.push(e.id); touched = true; paint(); };
+  /* recopie les champs ; rend false si l'utilisateur préfère compléter tout de suite */
+  return ({ force } = {}) => {
+    const texte = $('#fTx', el).value.trim();
+    if (!force && (!texte || !dest.length)) { if (!dest.length) $('#fDest', el).classList.add('need'); if (!confirm(`${!texte && !dest.length ? 'Texte et destinataire manquants' : !texte ? 'Texte manquant' : 'Destinataire manquant'}. Enregistrer quand même ? La photo restera « à compléter ».`)) return false; }
+    Object.assign(p, { texte, legende: texte.split('\n')[0].slice(0, 120), localisation: $('#fLoc', el).value.trim(), lotId: $('#fLot', el).value, destinataires: dest, emetteurId: $('#fEm', el).value });
+    if (dest.length && !lotEnt(p.lotId)) S.lastDest = dest;
+    return true;
+  };
+}
+/* fenêtre de prise de vue : texte, destinataire, localisation, puis repère sur le plan du niveau (et point visé, facultatif) */
 function locateSheet(p, ctx = {}) {
   return new Promise(async res => {
     const url = await BlobURL(p.thumbId || p.blobId); let plan = planById(p.planId) || planById(S.lastPlan) || S.plans[0], pt = p.planId ? { x: p.x, y: p.y, dir: p.dir } : null, aimNext = false;
     const fixedType = ctx.forObs || ctx.forReserve;
     const sh = sheet(fixedType ? 'Photo' : 'Nouvelle photo', `
-      <div class="row" style="align-items:flex-start"><img src="${url}" alt="" style="width:84px;height:84px;object-fit:cover;border-radius:8px;flex:none"><div class="grow" style="display:flex;flex-direction:column;gap:6px">
-        <input type="text" id="lLeg" placeholder="Légende ou observation" value="${esc(p.legende)}"><select id="lLot">${lotOptions(p.lotId)}</select></div></div>
-      ${fixedType ? '' : `<div class="levels" id="lType">${[['photo', 'Photo seule'], ['obs', 'Observation du CR du jour'], ['res', 'Réserve']].map(([k, t], i) => `<button type="button" class="chip${(ctx.type || 'photo') === k ? ' on' : ''}" data-t="${k}">${t}</button>`).join('')}</div>`}
-      ${S.plans.length ? `<div class="levels" id="lLev">${S.plans.map(pl => `<button type="button" class="chip${plan && pl.id === plan.id ? ' on' : ''}" data-l="${pl.id}">${esc(pl.nom)}</button>`).join('')}</div>
+      <div class="row" style="align-items:flex-start"><img src="${url}" alt="" style="width:84px;height:84px;object-fit:cover;border-radius:8px;flex:none"><div class="grow" style="display:flex;flex-direction:column;gap:8px">${phFieldsHTML(p)}</div></div>
+      ${fixedType ? '' : `<div class="levels" id="lType">${[['photo', 'Photo seule'], ['obs', 'Observation du CR du jour'], ['res', 'Réserve']].map(([k, t]) => `<button type="button" class="chip${(ctx.type || 'photo') === k ? ' on' : ''}" data-t="${k}">${t}</button>`).join('')}</div>`}
+      ${S.plans.length ? `<div class="f"><span>Niveau</span><div class="levels" id="lLev">${S.plans.map(pl => `<button type="button" class="chip${plan && pl.id === plan.id ? ' on' : ''}" data-l="${pl.id}">${esc(pl.nom)}</button>`).join('')}</div></div>
       <div class="hint" id="lHint">Touchez l'emplacement de la photo sur le plan, puis le point visé pour indiquer la direction (facultatif).</div><div id="lPv" style="height:min(58vh,560px)"></div>`
-      : `<div class="empty" style="padding:16px"><b>Aucun plan</b>Importez les plans de niveaux (onglet Plans) pour localiser les photos.</div>`}`,
-      `${S.plans.length ? '<button class="btn" id="lNo">Sans localisation</button>' : ''}<span class="grow"></span>${fixedType ? '' : '<button class="btn" id="lNext">Enregistrer, photo suivante</button>'}<button class="btn pri" id="lOk">Enregistrer</button>`, { wide: true });
+      : `<div class="hint">Aucun plan importé : indiquez le niveau dans la localisation (par exemple « Chambre 3, R+2 »).</div>`}`,
+      `${S.plans.length ? '<button class="btn" id="lNo">Sans repère sur plan</button>' : ''}<span class="grow"></span>${fixedType ? '' : '<button class="btn" id="lNext">Enregistrer, photo suivante</button>'}<button class="btn pri" id="lOk">Enregistrer</button>`, { wide: true });
+    const collect = bindPhFields(sh.el, p); $('#fTx', sh.el).focus();
     let type = ctx.type || 'photo';
     $$('[data-t]', sh.el).forEach(b => b.onclick = () => { type = b.dataset.t; $$('[data-t]', sh.el).forEach(x => x.classList.toggle('on', x === b)); });
-    let pv = null; const marks = () => { if (!pv) return; const other = S.photos.filter(q => q.planId === plan.id && q.id !== p.id).map(q => ({ x: q.x, y: q.y, kind: '', label: '', title: q.legende }));
+    let pv = null; const marks = () => { if (!pv) return; const other = S.photos.filter(q => q.planId === plan.id && q.id !== p.id).map(q => ({ x: q.x, y: q.y, kind: '', label: '', title: phTxt(q) }));
       pv.setMarkers([...other, ...(pt ? [{ x: pt.x, y: pt.y, dir: pt.dir, kind: 'new', label: '' }] : [])]); };
     if (S.plans.length) {
       pv = new PlanView($('#lPv', sh.el), { onTap: (x, y) => {
@@ -171,31 +202,45 @@ function locateSheet(p, ctx = {}) {
       await pv.load(plan); if (pt) pv.center(pt.x, pt.y, Math.max(pv.s, .35)); marks();
       $$('[data-l]', sh.el).forEach(b => b.onclick = async () => { plan = planById(b.dataset.l); if (pt && p.planId !== plan.id) pt = null; $$('[data-l]', sh.el).forEach(x => x.classList.toggle('on', x === b)); await pv.load(plan); marks(); });
     }
+    let saved = false;
     const done = async (next, noLoc) => {
-      p.legende = $('#lLeg', sh.el).value.trim(); p.lotId = $('#lLot', sh.el).value;
+      if (!collect()) return;
       if (!noLoc && pt && plan) { p.planId = plan.id; p.x = pt.x; p.y = pt.y; p.dir = pt.dir; S.lastPlan = plan.id; DB.meta('lastPlan', plan.id); } else if (noLoc) { p.planId = null; p.x = p.y = p.dir = null; }
-      await save('photos', p);
+      await save('photos', p); saved = true;
       if (!fixedType && type === 'obs') await addObsFromPhoto(p);
       if (!fixedType && type === 'res') await addReserveFromPhoto(p);
       sh.close(); res(p);
-      if (next) takePhoto({ ...ctx, type }); else if (!ctx.silent) render();
+      if (next) takePhoto({ ...ctx, type, lotId: p.lotId, destinataires: p.destinataires, localisation: '' }); else if (!ctx.silent) render();
     };
     $('#lOk', sh.el).onclick = () => done(false); if ($('#lNext', sh.el)) $('#lNext', sh.el).onclick = () => done(true); if ($('#lNo', sh.el)) $('#lNo', sh.el).onclick = () => done(false, true);
-    sh.bg.addEventListener('closed', () => res(p));
+    sh.bg.addEventListener('closed', () => { if (!saved && !ctx.silent) render(); res(p); });
   });
 }
 async function photoSheet(p) {
   const url = await BlobURL(p.blobId), plan = planById(p.planId), uses = [...S.visites.flatMap(v => (v.observations || []).filter(o => (o.photoIds || []).includes(p.id)).map(o => `CR n° ${v.numero}, ${lotLabel(o.lotId)}`)), ...S.reserves.filter(r => (r.photoIds || []).includes(p.id)).map(r => `Réserve n° ${r.numero}`)];
-  const sh = sheet('Photo du ' + fmtD(p.date) + ' à ' + fmtT(p.date), `<img class="photo-big" src="${url}" alt="${esc(p.legende)}">
-    <label class="f">Légende<input type="text" id="pLeg" value="${esc(p.legende)}"></label><label class="f">Lot<select id="pLot">${lotOptions(p.lotId)}</select></label>
-    <div class="small muted">${plan ? 'Localisée : ' + esc(plan.nom) : 'Pas encore localisée sur un plan'}${p.gps ? ` · GPS ${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}` : ''}${uses.length ? '<br>Utilisée dans : ' + esc(uses.join(' ; ')) : ''}</div>`,
-    `<button class="btn danger" id="pDel">Supprimer</button><span class="grow"></span><button class="btn" id="pLoc">${plan ? 'Déplacer sur le plan' : 'Localiser'}</button><button class="btn" id="pRes">Créer une réserve</button><button class="btn pri" id="pOk">Enregistrer</button>`);
-  const keep = async () => { p.legende = $('#pLeg', sh.el).value.trim(); p.lotId = $('#pLot', sh.el).value; await save('photos', p); };
-  $('#pOk', sh.el).onclick = async () => { await keep(); sh.close(); render(); };
-  $('#pLoc', sh.el).onclick = async () => { await keep(); sh.close(); await locateSheet(p, { forObs: true }); };
-  $('#pRes', sh.el).onclick = async () => { await keep(); sh.close(); const r = await addReserveFromPhoto(p); location.hash = `#/c/${S.ch.id}/r/${r.id}`; };
+  const sh = sheet('Photo du ' + fmtD(p.date) + ' à ' + fmtT(p.date), `<img class="photo-big" src="${url}" alt="${esc(phTxt(p))}">${phFieldsHTML(p)}
+    <div class="small muted">${plan ? 'Repère sur le plan : ' + esc(plan.nom) : 'Pas de repère sur un plan'}${p.gps ? ` · GPS ${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}` : ''}${p.envoyeLe ? ' · transmise le ' + fmtD(p.envoyeLe) : ''}${uses.length ? '<br>Utilisée dans : ' + esc(uses.join(' ; ')) : ''}</div>`,
+    `<button class="btn danger" id="pDel">Supprimer</button><span class="grow"></span><button class="btn" id="pShare">${ICON.share.replace('<svg', '<svg width="16" height="16" style="fill:none;stroke:currentColor;stroke-width:2"')} Transmettre</button><button class="btn" id="pLoc">${plan ? 'Déplacer sur le plan' : 'Placer sur le plan'}</button><button class="btn" id="pRes">Créer une réserve</button><button class="btn pri" id="pOk">Enregistrer</button>`);
+  const collect = bindPhFields(sh.el, p);
+  const keep = async force => { if (!collect({ force })) return false; await save('photos', p); return true; };
+  $('#pOk', sh.el).onclick = async () => { if (await keep()) { sh.close(); render(); } };
+  $('#pShare', sh.el).onclick = async () => { if (!(await keep())) return; await sharePhoto(p); };
+  $('#pLoc', sh.el).onclick = async () => { if (!(await keep(true))) return; sh.close(); await locateSheet(p, { forObs: true }); };
+  $('#pRes', sh.el).onclick = async () => { if (!(await keep(true))) return; sh.close(); const r = await addReserveFromPhoto(p); location.hash = `#/c/${S.ch.id}/r/${r.id}`; };
   $('#pDel', sh.el).onclick = async () => { if (!confirm('Supprimer cette photo ?')) return; for (const v of S.visites) { let ch = false; for (const o of v.observations || []) if ((o.photoIds || []).includes(p.id)) { o.photoIds = o.photoIds.filter(x => x !== p.id); ch = true; } if (ch) await save('visites', v); }
     for (const r of S.reserves) if ((r.photoIds || []).includes(p.id)) { r.photoIds = r.photoIds.filter(x => x !== p.id); await save('reserves', r); } p.deleted = true; await save('photos', p); sh.close(); render(); };
+}
+/* transmission d'une photo à ses destinataires : partage du téléphone (messagerie, WhatsApp…) avec la photo, sinon message préparé */
+async function sharePhoto(p) {
+  const dest = phDest(p), em = emetteurOf(p), loc = phLoc(p);
+  const subject = `${S.ch.code || S.ch.nom} - ${loc || 'photo du ' + fmtD(p.date)}`;
+  const txt = `${S.ch.nom}${S.ch.adresse ? ', ' + S.ch.adresse : ''}\n${loc ? 'Localisation : ' + loc + '\n' : ''}${p.lotId ? 'Lot ' + lotLabel(p.lotId) + '\n' : ''}\n${phTxt(p)}\n\nDe : ${entLabel(em)}\nÀ : ${dest.map(entLabel).join(', ')}\nPhoto du ${fmtD(p.date)} à ${fmtT(p.date)}`;
+  const b = await DB.getBlob(p.blobId), file = b && new File([b], subject.replace(/[\\/:*?"<>|]/g, '-') + '.jpg', { type: b.type || 'image/jpeg' });
+  const mark = async () => { p.envoyeLe = today(); await save('photos', p); };
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: subject, text: txt }); return mark(); } catch (e) { if (e.name === 'AbortError') return; } }
+  if (file) { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); }
+  location.href = `mailto:${dest.map(e => e.email).filter(Boolean).join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(txt + '\n\n(photo enregistrée dans vos téléchargements, à joindre)')}`;
+  await mark();
 }
 /* choix de photos du chantier (pour une observation ou une réserve) */
 function pickPhotos(pre = [], day) {
@@ -211,18 +256,18 @@ function pickPhotos(pre = [], day) {
 }
 
 /* ---------- Comptes-rendus ---------- */
-function newObs(lotId = '', texte = '', photoIds = []) { return { id: DB.uid(), lotId, texte, statut: 'afaire', echeance: '', photoIds, origine: null }; }
+function newObs(lotId = '', texte = '', photoIds = [], localisation = '') { return { id: DB.uid(), lotId, localisation, texte, statut: 'afaire', echeance: '', photoIds, origine: null }; }
 async function visiteDuJour(create = true) {
   let v = S.visites.find(x => x.date === today()); if (v || !create) return v;
-  v = { id: DB.uid(), chantierId: S.ch.id, numero: (S.visites.reduce((m, x) => Math.max(m, x.numero || 0), 0)) + 1, date: today(), heure: new Date().toTimeString().slice(0, 5), meteo: '', redacteur: S.auteur, presents: {}, autres: '', observations: [], prochaine: '', diffusion: '' };
+  v = { id: DB.uid(), chantierId: S.ch.id, numero: (S.visites.reduce((m, x) => Math.max(m, x.numero || 0), 0)) + 1, date: today(), heure: new Date().toTimeString().slice(0, 5), meteo: '', redacteur: S.auteur || (emetteurOf() || {}).contact || '', presents: {}, autres: '', observations: [], prochaine: '', diffusion: '' };
   return save('visites', v);
 }
-async function addObsFromPhoto(p) { const v = await visiteDuJour(); v.observations.push(newObs(p.lotId, p.legende, [p.id])); await save('visites', v); toast(`Ajoutée au CR n° ${v.numero}`); }
+async function addObsFromPhoto(p) { const v = await visiteDuJour(); v.observations.push(newObs(p.lotId, phTxt(p), [p.id], phLoc(p))); await save('visites', v); toast(`Ajoutée au CR n° ${v.numero}`); }
 function tabVisites(m) {
   m.innerHTML = `<div class="bar"><h2 class="grow" style="font-size:18px">Comptes-rendus</h2><button class="btn pri" id="bNv">+ Nouveau compte-rendu</button></div>
     <div class="list">${S.visites.map(v => { const o = v.observations || [], af = o.filter(x => x.statut === 'afaire').length; return `<a class="card ch" href="#/c/${S.ch.id}/v/${v.id}"><span class="ico">${v.numero}</span><span class="grow"><b>CR n° ${v.numero} · ${fmtDL(v.date)}</b><div class="small muted">${o.length} observation(s)${af ? `, ${af} à faire` : ''}${v.diffuseLe ? ' · diffusé le ' + fmtD(v.diffuseLe) : ''}</div></span></a>`; }).join('') || '<div class="empty"><b>Aucun compte-rendu</b>Créez le compte-rendu de la visite : les photos du jour vous seront proposées.</div>'}</div>`;
   $('#bNv').onclick = async () => {
-    const v = { id: DB.uid(), chantierId: S.ch.id, numero: (S.visites.reduce((mx, x) => Math.max(mx, x.numero || 0), 0)) + 1, date: today(), heure: '', meteo: '', redacteur: S.auteur, presents: {}, autres: '', observations: [], prochaine: '', diffusion: '' };
+    const v = { id: DB.uid(), chantierId: S.ch.id, numero: (S.visites.reduce((mx, x) => Math.max(mx, x.numero || 0), 0)) + 1, date: today(), heure: '', meteo: '', redacteur: S.auteur || (emetteurOf() || {}).contact || '', presents: {}, autres: '', observations: [], prochaine: '', diffusion: '' };
     const prev = S.visites[0]; if (prev) { v.presents = Object.fromEntries(Object.keys(prev.presents || {}).map(k => [k, ''])); v.observations = (prev.observations || []).filter(o => o.statut === 'afaire').map(o => ({ ...o, id: DB.uid(), origine: o.origine || prev.numero, photoIds: [] })); }
     await save('visites', v); location.hash = `#/c/${S.ch.id}/v/${v.id}`;
   };
@@ -243,6 +288,7 @@ async function viewVisite(app, id) {
     ${dayPh.length ? `<h3 style="margin:18px 0 6px;font-size:16px">Photos du ${fmtD(v.date)} non utilisées (${dayPh.length})</h3><div class="hint" style="margin-bottom:6px">Touchez une photo pour en faire une observation.</div><div class="thumbs" id="dayPh">${await thumbsHTML(dayPh)}</div>` : ''}
     <div class="bar" style="margin-top:18px"><h3 style="font-size:16px;flex:1 1 100%">Observations</h3><button class="btn" id="bPrev">Reprendre les points en cours du CR précédent</button><button class="btn pri" id="bObs">+ Observation</button></div>
     <div id="obsL">${lotsSorted.map(k => `<div class="lothead"><span class="code">${esc(lotById(k) ? lotById(k).code : '—')}</span>${esc(lotById(k) ? lotById(k).nom : 'Sans lot')}${lotById(k) && entById(lotById(k).entrepriseId) ? `<span class="muted small">· ${esc(entById(lotById(k).entrepriseId).nom)}</span>` : ''}</div>${obsByLot.get(k).map(o => obsHTML(o)).join('')}`).join('') || '<div class="empty">Aucune observation.</div>'}</div>
+    <datalist id="dlLoc">${locList().map(l => `<option value="${esc(l)}">`).join('')}</datalist>
     <label class="f" style="margin-top:16px">Diffusion complémentaire (les intervenants convoqués sont destinataires d'office)<textarea data-k="diffusion" rows="2" placeholder="Autres destinataires">${esc(v.diffusion)}</textarea></label>
     <div class="bar" style="margin-top:16px"><button class="btn danger" id="bDelV">Supprimer ce compte-rendu</button></div></main>
     <button class="fab" id="fab" aria-label="Photo pour ce compte-rendu">${ICON.cam}</button>`;
@@ -254,7 +300,7 @@ async function viewVisite(app, id) {
   $$('[data-o]', app).forEach(el => { const o = v.observations.find(x => x.id === el.dataset.o);
     el.querySelectorAll('[data-ok]').forEach(i => i.oninput = i.onchange = () => { o[i.dataset.ok] = i.value; if (i.dataset.ok === 'statut') el.className = 'obs st-' + o.statut; if (i.dataset.ok === 'lotId') { save('visites', v).then(render); return; } persist(); });
     el.querySelector('[data-act=ph]').onclick = async () => { const ids = await pickPhotos(o.photoIds || [], v.date); if (ids) { o.photoIds = ids; await save('visites', v); render(); } };
-    el.querySelector('[data-act=cam]').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, lotId: o.lotId, silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; if (!p.legende && o.texte) { p.legende = o.texte.slice(0, 80); await save('photos', p); } await save('visites', v); render(); }; inp.click(); };
+    el.querySelector('[data-act=cam]').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, lotId: o.lotId, texte: o.texte, localisation: o.localisation, silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; if (!o.localisation && phLoc(p)) o.localisation = phLoc(p); await save('visites', v); render(); }; inp.click(); };
     el.querySelector('[data-act=del]').onclick = async () => { if (!confirm('Supprimer cette observation ?')) return; v.observations = v.observations.filter(x => x !== o); await save('visites', v); render(); };
     el.querySelector('[data-act=res]').onclick = async () => { const r = await newReserve({ lotId: o.lotId, description: o.texte, photoIds: [...(o.photoIds || [])] }); const p = photoById((o.photoIds || [])[0]); if (p && p.planId) Object.assign(r, { planId: p.planId, x: p.x, y: p.y }); await save('reserves', r); toast(`Réserve n° ${r.numero} créée`); };
   });
@@ -262,13 +308,13 @@ async function viewVisite(app, id) {
   $('#bPrev').onclick = async () => { const prev = S.visites.filter(x => x.numero < v.numero).sort((a, b) => b.numero - a.numero)[0]; if (!prev) return toast('Pas de compte-rendu précédent');
     const have = new Set(v.observations.map(o => o.texte + '|' + o.lotId)), add = (prev.observations || []).filter(o => o.statut === 'afaire' && !have.has(o.texte + '|' + o.lotId)).map(o => ({ ...o, id: DB.uid(), origine: o.origine || prev.numero, photoIds: [] }));
     if (!add.length) return toast('Aucun point en cours à reprendre'); v.observations.push(...add); await save('visites', v); toast(`${add.length} point(s) repris du CR n° ${prev.numero}`); render(); };
-  if ($('#dayPh')) $$('#dayPh [data-ph]', app).forEach(b => b.onclick = async () => { const p = photoById(b.dataset.ph); v.observations.push(newObs(p.lotId, p.legende, [p.id])); await save('visites', v); render(); });
-  $('#fab').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, silent: true }); v.observations.push(newObs(p.lotId, p.legende, [p.id])); await save('visites', v); render(); }; inp.click(); };
+  if ($('#dayPh')) $$('#dayPh [data-ph]', app).forEach(b => b.onclick = async () => { const p = photoById(b.dataset.ph); v.observations.push(newObs(p.lotId, phTxt(p), [p.id], phLoc(p))); await save('visites', v); render(); });
+  $('#fab').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, silent: true }); v.observations.push(newObs(p.lotId, phTxt(p), [p.id], phLoc(p))); await save('visites', v); render(); }; inp.click(); };
   $('#bPdf').onclick = () => exportCR(v);
   $('#bDelV').onclick = async () => { if (!confirm(`Supprimer le CR n° ${v.numero} ?`)) return; v.deleted = true; await save('visites', v); location.hash = `#/c/${S.ch.id}/visites`; };
 }
 function obsHTML(o) {
-  return `<div class="obs st-${o.statut}" data-o="${o.id}"><textarea data-ok="texte" rows="2" placeholder="Observation">${esc(o.texte)}</textarea>
+  return `<div class="obs st-${o.statut}" data-o="${o.id}"><input type="text" data-ok="localisation" list="dlLoc" value="${esc(o.localisation || '')}" placeholder="Localisation (pièce, niveau)" autocomplete="off"><textarea data-ok="texte" rows="2" placeholder="Observation">${esc(o.texte)}</textarea>
     <div class="row" style="flex-wrap:wrap"><select data-ok="statut" style="width:auto">${Object.entries(OBS_ST).map(([k, t]) => `<option value="${k}"${o.statut === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
     <label class="row small muted" style="gap:4px">Échéance <input type="date" data-ok="echeance" value="${o.echeance || ''}" style="width:auto"></label>
     <select data-ok="lotId" style="width:auto;max-width:200px">${lotOptions(o.lotId)}</select>${o.origine ? `<span class="small muted">depuis le CR n° ${o.origine}</span>` : ''}</div>
@@ -282,7 +328,7 @@ function pickLot(title = 'Lot concerné') {
 
 /* ---------- Réserves (OPR) ---------- */
 async function newReserve(o = {}) { const r = { id: DB.uid(), chantierId: S.ch.id, numero: S.reserves.reduce((m, x) => Math.max(m, x.numero || 0), 0) + 1, lotId: '', description: '', localisation: '', planId: null, x: null, y: null, photoIds: [], statut: 'ouverte', phase: S._phase || 'OPR', dateConstat: today(), dateLevee: '', echeance: '', commentaire: '', ...o }; return save('reserves', r); }
-async function addReserveFromPhoto(p) { const r = await newReserve({ lotId: p.lotId, description: p.legende, photoIds: [p.id], planId: p.planId, x: p.x, y: p.y }); toast(`Réserve n° ${r.numero} créée`); return r; }
+async function addReserveFromPhoto(p) { const r = await newReserve({ lotId: p.lotId, description: phTxt(p), localisation: p.localisation || '', photoIds: [p.id], planId: p.planId, x: p.x, y: p.y }); toast(`Réserve n° ${r.numero} créée`); return r; }
 async function tabReserves(m) {
   const F = S._rF || (S._rF = { lot: '', statut: 'ouverte', phase: '' }), list = S.reserves.filter(r => (!F.lot || r.lotId === F.lot) && (!F.statut || r.statut === F.statut) && (!F.phase || r.phase === F.phase));
   m.innerHTML = `<div class="bar"><h2 class="grow" style="font-size:18px">Réserves</h2><button class="btn" id="bRx">Excel</button><button class="btn" id="bRp">PDF</button><button class="btn pri" id="bNr">+ Réserve</button></div>
@@ -300,7 +346,7 @@ async function viewReserve(app, id) {
   const plan = planById(r.planId);
   app.innerHTML = topBar(`Réserve n° ${r.numero}`, S.ch.nom, { back: `#/c/${S.ch.id}/reserves` }) + `<main>
     <div class="card" style="display:flex;flex-direction:column;gap:10px"><label class="f">Description<textarea data-k="description" rows="3">${esc(r.description)}</textarea></label>
-    <div class="grid2"><label class="f">Lot<select data-k="lotId">${lotOptions(r.lotId)}</select></label><label class="f">Localisation (pièce, repère)<input type="text" data-k="localisation" value="${esc(r.localisation)}" placeholder="Logement B12, salle de bains"></label>
+    <div class="grid2"><label class="f">Lot<select data-k="lotId">${lotOptions(r.lotId)}</select></label><label class="f">Localisation (pièce, repère)<input type="text" data-k="localisation" list="dlLoc" autocomplete="off" value="${esc(r.localisation)}" placeholder="Logement B12, salle de bains"></label><datalist id="dlLoc">${locList().map(l => `<option value="${esc(l)}">`).join('')}</datalist>
       <label class="f">Phase<select data-k="phase">${Object.entries(PHASES).map(([k, t]) => `<option value="${k}"${r.phase === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label><label class="f">Statut<select data-k="statut">${Object.entries(RES_ST).map(([k, t]) => `<option value="${k}"${r.statut === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
       <label class="f">Constatée le<input type="date" data-k="dateConstat" value="${r.dateConstat || ''}"></label><label class="f">À lever avant le<input type="date" data-k="echeance" value="${r.echeance || ''}"></label><label class="f">Levée le<input type="date" data-k="dateLevee" value="${r.dateLevee || ''}"></label></div>
     <label class="f">Commentaire<textarea data-k="commentaire" rows="2">${esc(r.commentaire)}</textarea></label></div>
@@ -365,47 +411,72 @@ async function planSheet(plan, { reserves } = {}) {
   const sh = sheet(plan.nom, `<div class="levels"><button class="chip${show.ph ? ' on' : ''}" data-s="ph">Photos</button><button class="chip on" data-s="res">Réserves</button></div><div id="psPv" style="height:min(72vh,760px)"></div>`, '', { wide: true });
   const pv = new PlanView($('#psPv', sh.el), { onMarker: mk => { if (mk.photo) photoSheet(mk.photo); else if (mk.res) { sh.close(); location.hash = `#/c/${S.ch.id}/r/${mk.res.id}`; } } });
   await pv.load(plan);
-  const draw = () => pv.setMarkers([...(show.ph ? S.photos.filter(p => p.planId === plan.id).map(p => ({ x: p.x, y: p.y, dir: p.dir, kind: '', label: '', title: p.legende || fmtD(p.date), photo: p })) : []),
+  const draw = () => pv.setMarkers([...(show.ph ? S.photos.filter(p => p.planId === plan.id).map(p => ({ x: p.x, y: p.y, dir: p.dir, kind: '', label: '', title: [phLoc(p), phTxt(p)].filter(Boolean).join(' : ') || fmtD(p.date), photo: p })) : []),
     ...(show.res ? (reserves || S.reserves).filter(r => r.planId === plan.id).map(r => ({ x: r.x, y: r.y, kind: r.statut === 'levee' ? 'done' : 'res', label: r.numero, title: r.description, res: r })) : [])]);
   draw(); $$('[data-s]', sh.el).forEach(b => b.onclick = () => { show[b.dataset.s] = !show[b.dataset.s]; b.classList.toggle('on', show[b.dataset.s]); draw(); });
 }
 
-/* ---------- Lots et entreprises ---------- */
+/* ---------- Intervenants (puisés dans le carnet TerraContacts) et lots ---------- */
+async function addFromCarnet(role, { lot } = {}) {
+  const k = await Carnet.pick({ role, title: role ? roleName(role) : 'Intervenant', lot }); if (!k) return null;
+  let e = intervenants().find(x => x.contactId === k.c.id && (!k.pid || x.personneId === k.pid));
+  if (!e) { e = Carnet.asIntervenant(k.c, k.pid, { id: DB.uid(), role: role || (k.c.agence ? 'MOE' : k.c.role), convoque: true }); S.ch.entreprises.push(e); if (!S.ch.emetteurId && k.c.agence) S.ch.emetteurId = e.id; await save('chantiers', S.ch); }
+  return e;
+}
 function tabFiche(m) {
-  const c = S.ch; c.lots = c.lots || []; c.entreprises = c.entreprises || []; const field = isField(), L = intervenants();
+  const c = S.ch; c.lots = c.lots || []; c.entreprises = c.entreprises || []; const field = isField(), L = intervenants(), em = emetteurOf();
   const groups = ROLES.map(([k]) => [k, L.filter(e => e.role === k)]).filter(g => g[1].length);
-  const ro = e => `<div class="card" style="display:flex;flex-direction:column;gap:2px"><b>${esc(e.nom || '(sans nom)')}</b><span class="small muted">${esc([e.contact, e.fonction, e.role === 'ENT' ? lotsOf().filter(l => l.entrepriseId === e.id).map(l => 'lot ' + l.code).join(', ') : ''].filter(Boolean).join(' · '))}</span>
-    <span class="row small" style="gap:14px;flex-wrap:wrap">${e.tel ? `<a href="tel:${esc(e.tel.replace(/\s/g, ''))}">${esc(e.tel)}</a>` : ''}${e.email ? `<a href="mailto:${esc(e.email)}">${esc(e.email)}</a>` : ''}</span></div>`;
-  const ed = e => `<div class="card" data-e="${e.id}"><div class="grid2"><label class="f">Rôle<select data-f="role">${ROLES.map(([k, t]) => `<option value="${k}"${e.role === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+  const lotsOfE = e => lotsOf().filter(l => l.entrepriseId === e.id).map(l => 'lot ' + l.code).join(', ');
+  const coords = e => `<span class="row small" style="gap:14px;flex-wrap:wrap">${e.tel ? `<a href="tel:${esc(e.tel.replace(/\s/g, ''))}">${esc(e.tel)}</a>` : ''}${e.email ? `<a href="mailto:${esc(e.email)}">${esc(e.email)}</a>` : ''}</span>`;
+  const ro = e => `<div class="card" style="display:flex;flex-direction:column;gap:2px"><b>${esc(e.nom || '(sans nom)')}${em && em.id === e.id ? ' <span class="badge b-refusee">émetteur</span>' : ''}</b><span class="small muted">${esc([e.contact, e.fonction, e.role === 'ENT' ? lotsOfE(e) : ''].filter(Boolean).join(' · '))}</span>${coords(e)}</div>`;
+  const roleSel = e => `<select data-f="role" style="width:auto">${ROLES.map(([k, t]) => `<option value="${k}"${e.role === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  const conv = e => `<label class="row small muted" style="gap:5px"><input type="checkbox" data-f="convoque"${e.convoque === false ? '' : ' checked'}> Convoqué aux réunions et destinataire des CR</label>`;
+  const linked = e => { const k = Carnet.byId(e.contactId); return `<div class="card" data-e="${e.id}"><div class="row" style="flex-wrap:wrap;align-items:flex-start"><div class="grow" style="min-width:200px"><b>${esc(e.nom)}</b> <span class="badge b-levee" title="Coordonnées tenues à jour depuis TerraContacts">carnet</span>${em && em.id === e.id ? ' <span class="badge b-refusee">émetteur</span>' : ''}
+      <div class="small muted">${esc([e.fonction, e.role === 'ENT' ? lotsOfE(e) : ''].filter(Boolean).join(' · '))}</div>${coords(e)}</div>${roleSel(e)}</div>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap"><label class="f" style="flex:1;min-width:180px">Interlocuteur<select data-f="personneId">${k.personnes.map(p => `<option value="${p.id}"${e.personneId === p.id ? ' selected' : ''}>${esc(Carnet.fullName(p) || p.email)}${p.fonction ? ' · ' + esc(p.fonction) : ''}</option>`).join('')}${k.personnes.length ? '' : '<option value="">(aucun interlocuteur)</option>'}</select></label></div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap">${conv(e)}<span class="grow"></span><button class="btn sm" data-kedit>Modifier la fiche</button><button class="btn sm danger" data-rm>Retirer</button></div></div>`; };
+  const free = e => `<div class="card" data-e="${e.id}"><div class="grid2"><label class="f">Rôle${roleSel(e).replace('style="width:auto"', '')}</label>
     <label class="f">Société ou organisme<input type="text" data-f="nom" value="${esc(e.nom)}"></label><label class="f">Interlocuteur<input type="text" data-f="contact" value="${esc(e.contact)}"></label><label class="f">Fonction<input type="text" data-f="fonction" value="${esc(e.fonction || '')}" placeholder="Conducteur de travaux, chef de projet…"></label>
     <label class="f">Téléphone<input type="tel" data-f="tel" value="${esc(e.tel)}"></label><label class="f">E-mail<input type="email" data-f="email" value="${esc(e.email)}"></label></div>
-    <div class="row" style="margin-top:6px"><label class="row small muted" style="gap:5px"><input type="checkbox" data-f="convoque"${e.convoque === false ? '' : ' checked'}> Convoqué aux réunions et destinataire des CR</label><span class="grow"></span><button class="btn sm danger" data-rm>Retirer</button></div></div>`;
-  m.innerHTML = `<div class="bar"><h2 class="grow" style="font-size:18px">${esc(c.nom)}</h2>${field ? '' : '<button class="btn" id="bEdC">Modifier le chantier</button>'}</div>
+    <div class="row" style="margin-top:6px;flex-wrap:wrap">${conv(e)}<span class="grow"></span><button class="btn sm" data-ksave title="Crée la fiche dans TerraContacts et la relie à ce chantier">Enregistrer dans le carnet</button><button class="btn sm danger" data-rm>Retirer</button></div></div>`;
+  m.innerHTML = `<div class="bar"><h2 class="grow" style="font-size:18px">${esc(c.nom)}</h2>${field ? '' : '<a class="btn" href="contacts.html">Carnet de contacts</a><button class="btn" id="bEdC">Modifier le chantier</button>'}</div>
     ${c.adresse ? `<div class="card small muted" style="margin-bottom:14px">${esc(c.adresse)}</div>` : ''}
-    <div class="bar"><h3 class="grow" style="font-size:16px">Intervenants</h3>${field ? '' : `<select id="addRole" style="width:auto">${ROLES.map(([k, t]) => `<option value="${k}">${esc(t)}</option>`).join('')}</select><button class="btn" id="bAddE">+ Ajouter</button>`}</div>
-    ${groups.map(([k, es]) => `<div class="lothead"><span class="code">${k}</span>${esc(roleName(k))}</div><div class="list">${es.map(field ? ro : ed).join('')}</div>`).join('') || `<div class="empty" style="padding:16px">${field ? 'Aucun intervenant.' : "Ajoutez le maître d'ouvrage, la maîtrise d'œuvre, le bureau de contrôle, le coordonnateur SPS, les entreprises, les utilisateurs…"}</div>`}
+    ${field ? '' : `<div class="card" style="margin-bottom:14px"><label class="f">Émetteur des comptes-rendus et des photos (par défaut l'architecte du chantier)<select id="emSel">${L.map(e => `<option value="${e.id}"${em && em.id === e.id ? ' selected' : ''}>${esc(roleName(e.role) + ' · ' + entLabel(e))}</option>`).join('')}${em ? '' : '<option value="" selected>(à choisir)</option>'}</select></label></div>`}
+    <div class="bar"><h3 class="grow" style="font-size:16px">Intervenants</h3>${field ? '' : `<select id="addRole" style="width:auto">${ROLES.map(([k, t]) => `<option value="${k}">${esc(t)}</option>`).join('')}</select><button class="btn pri" id="bAddK">+ Depuis le carnet</button><button class="btn" id="bAddE">+ Saisie libre</button>`}</div>
+    ${groups.map(([k, es]) => `<div class="lothead"><span class="code">${k}</span>${esc(roleName(k))}</div><div class="list">${es.map(e => field ? ro(e) : e.contactId && Carnet.byId(e.contactId) ? linked(e) : free(e)).join('')}</div>`).join('') || `<div class="empty" style="padding:16px">${field ? 'Aucun intervenant.' : "Ajoutez le maître d'ouvrage, la maîtrise d'œuvre, le bureau de contrôle, le coordonnateur SPS, les entreprises… depuis le carnet de contacts."}</div>`}
     <div class="bar" style="margin-top:18px"><h3 class="grow" style="font-size:16px">Lots</h3>${field ? '' : (c.lots.length ? '' : '<button class="btn" id="bTpl">Liste habituelle</button>') + '<button class="btn" id="bAddL">+ Lot</button>'}</div>
-    <div class="card" style="padding:0 8px">${c.lots.length ? `<table class="t"><thead><tr><th style="width:70px">N°</th><th>Intitulé</th><th>Entreprise</th>${field ? '' : '<th></th>'}</tr></thead><tbody>${c.lots.slice().sort((a, b) => a.code.localeCompare(b.code)).map(l => field ? `<tr><td><b>${esc(l.code)}</b></td><td>${esc(l.nom)}</td><td>${esc((entById(l.entrepriseId) || {}).nom || '—')}</td></tr>` : `<tr data-l="${l.id}"><td><input type="text" data-f="code" value="${esc(l.code)}"></td><td><input type="text" data-f="nom" value="${esc(l.nom)}"></td><td><select data-f="entrepriseId"><option value="">—</option>${L.filter(e => e.role === 'ENT' || e.id === l.entrepriseId).map(e => `<option value="${e.id}"${l.entrepriseId === e.id ? ' selected' : ''}>${esc(e.nom)}</option>`).join('')}</select></td><td><button class="btn sm danger" data-rm aria-label="Retirer">×</button></td></tr>`).join('')}</tbody></table>` : '<div class="empty" style="padding:16px">Aucun lot.</div>'}</div>`;
+    <div class="card" style="padding:0 8px">${c.lots.length ? `<table class="t"><thead><tr><th style="width:70px">N°</th><th>Intitulé</th><th>Entreprise</th>${field ? '' : '<th></th>'}</tr></thead><tbody>${c.lots.slice().sort((a, b) => a.code.localeCompare(b.code)).map(l => field ? `<tr><td><b>${esc(l.code)}</b></td><td>${esc(l.nom)}</td><td>${esc((entById(l.entrepriseId) || {}).nom || '—')}</td></tr>` : `<tr data-l="${l.id}"><td><input type="text" data-f="code" value="${esc(l.code)}"></td><td><input type="text" data-f="nom" value="${esc(l.nom)}"></td><td><select data-f="entrepriseId"><option value="">—</option>${L.filter(e => e.role === 'ENT' || e.id === l.entrepriseId).map(e => `<option value="${e.id}"${l.entrepriseId === e.id ? ' selected' : ''}>${esc(e.nom)}</option>`).join('')}<option value="__k">Choisir dans le carnet…</option></select></td><td><button class="btn sm danger" data-rm aria-label="Retirer">×</button></td></tr>`).join('')}</tbody></table>` : '<div class="empty" style="padding:16px">Aucun lot.</div>'}</div>`;
   if (field) return;
   const persist = () => save('chantiers', c);
   $('#bEdC').onclick = () => editChantier(c);
+  if ($('#emSel')) $('#emSel').onchange = async e => { c.emetteurId = e.target.value; await persist(); tabFiche(m); };
+  $('#bAddK').onclick = async () => { const e = await addFromCarnet($('#addRole').value); if (e) tabFiche(m); };
   $('#bAddE').onclick = async () => { const role = $('#addRole').value, e = { id: DB.uid(), role, nom: '', contact: '', fonction: '', tel: '', email: '', convoque: true }; c.entreprises.push(e); await persist(); tabFiche(m); const el = $(`[data-e="${e.id}"] [data-f=nom]`, m); if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); } };
   $('#bAddL').onclick = async () => { const n = c.lots.reduce((mx, l) => Math.max(mx, parseInt(l.code) || 0), 0) + 1; c.lots.push({ id: DB.uid(), code: String(n).padStart(2, '0'), nom: 'Nouveau lot', entrepriseId: '' }); await persist(); tabFiche(m); };
   if ($('#bTpl')) $('#bTpl').onclick = async () => { c.lots = DEFAULT_LOTS.map(([code, nom]) => ({ id: DB.uid(), code, nom, entrepriseId: '' })); await persist(); tabFiche(m); };
   $$('[data-e]', m).forEach(el => { const e = c.entreprises.find(x => x.id === el.dataset.e);
-    el.querySelectorAll('[data-f]').forEach(i => i.onchange = () => { e[i.dataset.f] = i.type === 'checkbox' ? i.checked : i.value.trim(); persist(); if (i.dataset.f === 'role') tabFiche(m); });
-    el.querySelector('[data-rm]').onclick = async () => { if (!confirm(`Retirer ${e.nom || 'cet intervenant'} ?`)) return; c.entreprises = c.entreprises.filter(x => x !== e); for (const l of c.lots) if (l.entrepriseId === e.id) l.entrepriseId = ''; await persist(); tabFiche(m); }; });
-  $$('[data-l]', m).forEach(tr => { const l = c.lots.find(x => x.id === tr.dataset.l); tr.querySelectorAll('[data-f]').forEach(i => i.onchange = () => { l[i.dataset.f] = i.value.trim(); persist(); }); tr.querySelector('[data-rm]').onclick = async () => { if (!confirm(`Retirer le lot ${l.code} ${l.nom} ?`)) return; c.lots = c.lots.filter(x => x !== l); await persist(); tabFiche(m); }; });
+    el.querySelectorAll('[data-f]').forEach(i => i.onchange = async () => { e[i.dataset.f] = i.type === 'checkbox' ? i.checked : i.value.trim(); if (i.dataset.f === 'personneId') Carnet.asIntervenant(Carnet.byId(e.contactId), e.personneId, e); await persist(); if (['role', 'personneId'].includes(i.dataset.f)) tabFiche(m); });
+    el.querySelector('[data-rm]').onclick = async () => { if (!confirm(`Retirer ${e.nom || 'cet intervenant'} du chantier ?`)) return; c.entreprises = c.entreprises.filter(x => x !== e); for (const l of c.lots) if (l.entrepriseId === e.id) l.entrepriseId = ''; if (c.emetteurId === e.id) c.emetteurId = ''; await persist(); tabFiche(m); };
+    const ke = el.querySelector('[data-kedit]'); if (ke) ke.onclick = async () => { const k = await Carnet.edit(Carnet.byId(e.contactId)); if (k || !Carnet.byId(e.contactId)) { Carnet.refreshChantier(c); await persist(); tabFiche(m); } };
+    const ks = el.querySelector('[data-ksave]'); if (ks) ks.onclick = async () => { if (!e.nom) return toast('Indiquez d\'abord le nom de la société');
+      const parts = (e.contact || '').trim().split(/\s+/), p = e.contact || e.email || e.tel ? { id: DB.uid(), civ: '', prenom: parts.length > 1 ? parts.slice(0, -1).join(' ') : '', nom: parts.length > 1 ? parts.slice(-1)[0] : parts[0] || '', fonction: e.fonction || '', mobile: e.tel || '', tel: '', email: e.email || '', principal: true } : null;
+      const k = await Carnet.edit({ id: DB.uid(), role: e.role, nom: e.nom, adresse: '', cp: '', ville: '', tel: '', email: '', site: '', siret: '', notes: '', lots: e.role === 'ENT' ? lotsOf().filter(l => l.entrepriseId === e.id).map(l => l.code) : [], personnes: p ? [p] : [] }, { fresh: true }); if (!k) return;
+      e.contactId = k.id; e.personneId = (Carnet.principal(k) || {}).id || ''; Carnet.asIntervenant(k, e.personneId, e); await persist(); toast('Ajouté au carnet de contacts'); tabFiche(m); };
+  });
+  $$('[data-l]', m).forEach(tr => { const l = c.lots.find(x => x.id === tr.dataset.l); tr.querySelectorAll('[data-f]').forEach(i => i.onchange = async () => {
+      if (i.value === '__k') { const e = await addFromCarnet('ENT', { lot: l.code }); if (e) { l.entrepriseId = e.id; e.role = e.role || 'ENT'; await persist(); } tabFiche(m); return; }
+      l[i.dataset.f] = i.value.trim(); persist(); });
+    tr.querySelector('[data-rm]').onclick = async () => { if (!confirm(`Retirer le lot ${l.code} ${l.nom} ?`)) return; c.lots = c.lots.filter(x => x !== l); await persist(); tabFiche(m); }; });
 }
 
 /* ================= Réglages ================= */
 async function settingsSheet() {
   const cfg = await Sync.config(), est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
-  const sh = sheet('Réglages', `<label class="f">Votre nom (rédacteur des comptes-rendus)<input type="text" id="sAut" value="${esc(S.auteur)}"></label>
+  const sh = sheet('Réglages', `<label class="f">Votre nom sur cet appareil (rédacteur des comptes-rendus)<input type="text" id="sAut" value="${esc(S.auteur)}"></label>
     <label class="f">Affichage<select id="sMode"><option value="auto"${S.mode === 'auto' ? ' selected' : ''}>Automatique : mode terrain sur téléphone, version complète sur PC et tablette</option><option value="terrain"${S.mode === 'terrain' ? ' selected' : ''}>Mode terrain (photos, CR, réserves)</option><option value="complet"${S.mode === 'complet' ? ' selected' : ''}>Version complète (tout faire, y compris la préparation)</option></select></label>
     <div class="card"><b>Synchronisation entre appareils</b><div class="hint" style="margin:4px 0 8px">Téléphone, tablette et PC partagent les mêmes chantiers, plans et photos.</div>${Sync.formHTML(cfg)}</div>
     <div class="card"><b>Sauvegarde</b><div class="hint" style="margin:4px 0 8px">Fichier de sauvegarde complet de cet appareil (chantiers, plans, photos).${est ? ` Espace utilisé : ${(est.usage / 1048576).toFixed(0)} Mo.` : ''}</div><div class="row" style="flex-wrap:wrap"><button class="btn" id="sExp">Enregistrer une sauvegarde</button><button class="btn" id="sImp">Restaurer une sauvegarde</button></div></div>
-    <div class="small muted">TerraChantier ${APP_VERSION} bêta · TERRAFORM</div>`, `<button class="btn pri" data-close>Fermer</button>`);
+    <div class="small muted">TerraChantier ${APP_VERSION} bêta · TerraSuite${Carnet.agence() ? ' · ' + esc(Carnet.agence().nom) : ''} · <a href="contacts.html#/agence">Mon agence</a></div>`, `<button class="btn pri" data-close>Fermer</button>`);
   $('#sAut', sh.el).onchange = e => { S.auteur = e.target.value.trim(); DB.meta('auteur', S.auteur); };
   $('#sMode', sh.el).onchange = e => { S.mode = e.target.value; DB.meta('mode', S.mode); render(); };
   Sync.bindForm(sh.el);
@@ -429,10 +500,6 @@ async function backupImport(file) {
 (async function init() {
   S.auteur = (await DB.meta('auteur')) || ''; S.mode = (await DB.meta('mode')) || 'auto'; S.lastPlan = await DB.meta('lastPlan');
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    const had = !!navigator.serviceWorker.controller; let done = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !done) { done = true; location.reload(); } }); // nouvelle version installée : rechargement
-    navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(e => console.warn('SW', e));
-  }
+  registerSW(); await Carnet.load();
   await render(); Sync.start();
 })();

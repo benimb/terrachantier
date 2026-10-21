@@ -1,7 +1,7 @@
-/* TerraChantier : synchronisation entre appareils (Supabase : base partagée + stockage des photos et des plans).
+/* TerraSuite en ligne (TerraChantier, TerraContacts) : synchronisation entre appareils (Supabase : base partagée + stockage des photos et des plans).
    Hors réseau, tout reste enregistré sur l'appareil ; l'envoi et la réception reprennent dès que le réseau revient.
    En cas de modification d'une même fiche sur deux appareils, la plus récente l'emporte. */
-const SYNC_SQL = `-- TerraChantier : à exécuter une fois dans Supabase (SQL Editor)
+const SYNC_SQL = `-- TerraSuite (TerraChantier, TerraContacts) : à exécuter une fois dans le projet Supabase de l'agence (SQL Editor)
 create table if not exists public.tc_items (
   id uuid primary key, store text not null, chantier_id uuid, data jsonb not null,
   updated_at timestamptz not null, deleted boolean not null default false, server_at timestamptz not null default now());
@@ -16,6 +16,7 @@ insert into storage.buckets (id, name, public) values ('tc-blobs', 'tc-blobs', f
 drop policy if exists tc_blobs_team on storage.objects;
 create policy tc_blobs_team on storage.objects for all to authenticated using (bucket_id = 'tc-blobs') with check (bucket_id = 'tc-blobs');`;
 
+const DB_SCHEMA = 2;
 const Sync = (() => {
   let sb = null, cfg = null, state = 'off', msg = 'Synchronisation non configurée', timer = null, busy = false, again = false;
   const set = (s, m) => { state = s; msg = m; paint(); };
@@ -46,6 +47,8 @@ const Sync = (() => {
       // images : envoyées une fois (identifiant unique, jamais modifiées)
       for (const id of await DB.allBlobIds()) { const r = await DB.blobRec(id); if (!r || r.synced) continue; const { error } = await c.storage.from('tc-blobs').upload(id, r.blob, { contentType: r.type || 'image/jpeg', upsert: true }); if (error && !/exists|Duplicate/i.test(error.message)) throw error; await DB.markBlob(id, 1); }
       // réception : tout ce qui a changé sur le serveur depuis la dernière fois
+      // base passée en v2 (carnet de contacts) : les fiches ignorées par l'ancienne version sont relues une fois
+      if ((await DB.meta('syncSchema')) !== DB_SCHEMA) { await DB.meta('syncSince', null); await DB.meta('syncSchema', DB_SCHEMA); }
       let since = (await DB.meta('syncSince')) || '1970-01-01T00:00:00Z';
       for (;;) {
         const { data, error } = await c.from('tc_items').select('*').gt('server_at', since).order('server_at').limit(500); if (error) throw error; if (!data.length) break;
@@ -55,6 +58,7 @@ const Sync = (() => {
       }
       await DB.meta('syncAt', new Date().toISOString());
       set('ok', `Synchronisé à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}${sent || got ? ` (${sent} envoyée(s), ${got} reçue(s))` : ''}`);
+      if (got && typeof Carnet !== 'undefined') await Carnet.load(true);
       if (got && typeof render === 'function' && !document.querySelector('.sheet-bg') && !/\/v\/|\/r\//.test(location.hash)) { S._fresh = false; render(); } else if (got) S._fresh = false;
     } catch (e) { console.warn('sync', e); set('err', 'Synchronisation interrompue : ' + (e.message || e)); }
     finally { busy = false; if (again) { again = false; setTimeout(run, 500); } }
