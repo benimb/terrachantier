@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '0.4.2';
 /* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
@@ -289,6 +289,15 @@ async function newVisite(date = today(), heure = '') {
   if (prev) v.observations = (prev.observations || []).filter(o => o.statut !== 'fait').map(o => carry(o, prev)); // questions du jour et en cours du CR précédent → en cours
   return save('visites', v);
 }
+/* reprise automatique : toute question non réglée du CR précédent absente de celui-ci y est ajoutée en « en cours »
+   (cas d'un CR créé avant que les questions du précédent soient saisies) ; une question retirée à la main n'est pas remise */
+async function injectPrev(v) {
+  const prev = prevVisite(v); if (!prev) return 0;
+  await injectPrev(prev); // chaîne C01 → C02 → C03
+  const have = new Set([...(v.observations || []).map(o => o.qid || qNum(o)), ...(v.retires || [])]);
+  const add = (prev.observations || []).filter(o => o.statut !== 'fait' && (o.texte || '').trim() && !have.has(o.qid || qNum(o))).map(o => carry(o, prev));
+  if (!add.length) return 0; v.observations = [...(v.observations || []), ...add]; await save('visites', v); return add.length;
+}
 async function visiteDuJour(create = true) { const v = S.visites.find(x => x.date === today()); return v || !create ? v : newVisite(today(), new Date().toTimeString().slice(0, 5)); }
 async function addObsFromPhoto(p) { const v = await visiteDuJour(); const o = newObs(v, p.lotId, phTxt(p), [p.id], phLoc(p)); v.observations.push(o); await save('visites', v); toast(`Question ${qNum(o)} ajoutée au ${crName(v.numero)}`); }
 function tabVisites(m) {
@@ -298,6 +307,7 @@ function tabVisites(m) {
 }
 async function viewVisite(app, id) {
   const v = S.visites.find(x => x.id === id); if (!v) { location.hash = `#/c/${S.ch.id}/visites`; return; }
+  if (await injectPrev(v)) toast('Questions non réglées du compte-rendu précédent reprises en questions en cours');
   const ents = crEnts(v), lotKey = k => lotById(k) ? lotById(k).code : '~';
   const sect = s => { const qs = v.observations.filter(o => qSect(v, o) === s).sort((a, b) => lotKey(a.lotId).localeCompare(lotKey(b.lotId)) || (a.cr - b.cr) || (a.seq - b.seq)); let h = '', last = null;
     for (const o of qs) { if (o.lotId !== last) { last = o.lotId; const l = lotById(o.lotId); h += `<div class="lothead"><span class="code">${esc(l ? l.code : '—')}</span>${esc(l ? l.nom : 'Généralités')}${l && entById(l.entrepriseId) ? `<span class="muted small">· ${esc(entById(l.entrepriseId).nom)}</span>` : ''}</div>`; } h += obsHTML(o, v); }
@@ -334,7 +344,7 @@ async function viewVisite(app, id) {
     el.querySelector('[data-act=ph]').onclick = async () => { const ids = await pickPhotos(o.photoIds || [], v.date); if (ids) { o.photoIds = ids; await save('visites', v); render(); } };
     el.querySelector('[data-act=cam]').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, lotId: o.lotId, texte: o.texte, localisation: o.localisation, silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; if (!o.localisation && phLoc(p)) o.localisation = phLoc(p); await save('visites', v); render(); }; inp.click(); };
     const mv = el.querySelector('[data-act=done]') || el.querySelector('[data-act=open]'); mv.onclick = async () => { if (o.statut === 'fait') { o.statut = 'afaire'; delete o.regleeAu; } else { o.statut = 'fait'; o.regleeAu = v.numero; } await save('visites', v); render(); };
-    el.querySelector('[data-act=del]').onclick = async () => { if (!confirm(`Supprimer la question ${qNum(o)} de ce compte-rendu ?`)) return; v.observations = v.observations.filter(x => x !== o); await save('visites', v); render(); };
+    el.querySelector('[data-act=del]').onclick = async () => { if (!confirm(`Supprimer la question ${qNum(o)} de ce compte-rendu ?`)) return; v.observations = v.observations.filter(x => x !== o); if (o.cr < v.numero) v.retires = [...(v.retires || []), o.qid || qNum(o)]; await save('visites', v); render(); };
     el.querySelector('[data-act=res]').onclick = async () => { const r = await newReserve({ lotId: o.lotId, description: o.texte, localisation: o.localisation || '', photoIds: [...(o.photoIds || [])] }); const p = photoById((o.photoIds || [])[0]); if (p && p.planId) Object.assign(r, { planId: p.planId, x: p.x, y: p.y }); await save('reserves', r); toast(`Réserve n° ${r.numero} créée`); };
   });
   $('#bObs').onclick = async () => { const lotId = await pickLot(); if (lotId === null) return; v.observations.push(newObs(v, lotId)); await save('visites', v); await render(); const last = $$('.qsect')[0] && $$('[data-o] textarea', $$('.qsect')[0]).pop(); if (last) { last.focus(); last.scrollIntoView({ block: 'center' }); } };
