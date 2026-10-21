@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.4.5';
+const APP_VERSION = '0.4.6';
 /* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
@@ -369,9 +369,8 @@ async function viewVisite(app, id) {
 }
 function obsHTML(o, v) {
   const hist = [o.cr && o.cr < v.numero ? `posée au ${crName(o.cr)}` : '', o.photosCR && !(o.photoIds || []).length ? `photos au ${crName(o.photosCR)}` : ''].filter(Boolean).join(' · ');
-  return `<div class="obs st-${o.statut}" data-o="${o.id}"><div class="row" style="gap:8px"><span class="qnum">${esc(qNum(o))}</span><input type="text" data-ok="localisation" list="dlLoc" value="${esc(o.localisation || '')}" placeholder="Localisation (pièce, niveau)" autocomplete="off" class="grow"></div><textarea data-ok="texte" rows="2" placeholder="Question, constat, demande">${esc(o.texte)}</textarea>
-    <div class="qwho"><label class="row small muted" style="gap:6px">De<select data-ok="emetteurId" style="width:auto;max-width:260px">${intervenants().map(e => `<option value="${e.id}"${qEm(o) && qEm(o).id === e.id ? ' selected' : ''}>${esc(entLabel(e))}</option>`).join('')}</select></label>
-      <span class="small muted">À</span><div class="levels wrap">${[['TOUS', 'Tous'], ...intervenants().filter(e => !qEm(o) || e.id !== qEm(o).id).map(e => [e.id, entShort(e)])].map(([id, t]) => `<button type="button" class="chip${qDest(o).includes(id) ? ' on' : ''}" data-qd="${id}">${esc(t)}</button>`).join('')}</div></div>
+  return `<div class="obs st-${o.statut}" data-o="${o.id}">    <div class="qwho"><label class="row small muted" style="gap:6px">De<select data-ok="emetteurId" style="width:auto;max-width:260px">${intervenants().map(e => `<option value="${e.id}"${qEm(o) && qEm(o).id === e.id ? ' selected' : ''}>${esc(entLabel(e))}</option>`).join('')}</select></label>
+      <span class="small muted">À</span><div class="levels wrap">${[['TOUS', 'Tous'], ...intervenants().filter(e => !qEm(o) || e.id !== qEm(o).id).map(e => [e.id, entShort(e)])].map(([id, t]) => `<button type="button" class="chip${qDest(o).includes(id) ? ' on' : ''}" data-qd="${id}">${esc(t)}</button>`).join('')}</div></div><div class="row" style="gap:8px"><span class="qnum">${esc(qNum(o))}</span><input type="text" data-ok="localisation" list="dlLoc" value="${esc(o.localisation || '')}" placeholder="Localisation (pièce, niveau)" autocomplete="off" class="grow"></div><textarea data-ok="texte" rows="2" placeholder="Question, constat, demande">${esc(o.texte)}</textarea>
     <div class="row" style="flex-wrap:wrap"><select data-ok="statut" style="width:auto">${Object.entries(OBS_ST).map(([k, t]) => `<option value="${k}"${o.statut === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
     <label class="row small muted" style="gap:4px">Échéance <input type="date" data-ok="echeance" value="${o.echeance || ''}" style="width:auto"></label>
     <select data-ok="lotId" style="width:auto;max-width:200px">${lotOptions(o.lotId)}</select>${hist ? `<span class="small muted">${hist}</span>` : ''}</div>

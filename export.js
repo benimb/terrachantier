@@ -73,10 +73,10 @@ async function exportCR(v) {
       if (o.lotId !== last) { last = o.lotId; const l = lotById(o.lotId), ent = l && entById(l.entrepriseId); ctx.need(18); doc.setFillColor(240, 235, 247); doc.rect(M, ctx.y, W - 2 * M, 6.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(90, 55, 140);
         doc.text(pdfTxt(l ? `Lot ${l.code} - ${l.nom}` : 'Généralités'), M + 2, ctx.y + 4.5); if (ent) { doc.setFont('helvetica', 'normal'); doc.setTextColor(100); doc.text(pdfTxt(ent.nom), W - M - 2, ctx.y + 4.5, { align: 'right' }); } ctx.y += 8.5; }
       const col = o.statut === 'fait' ? [47, 143, 91] : o.statut === 'info' ? [47, 111, 181] : [194, 65, 12];
-      ctx.need(12); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...col); doc.text(qNum(o), M, ctx.y + 3.6);
+      ctx.need(12); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...col); doc.text(qNum(o), M, ctx.y + 3);
+      ctx.text(`De : ${entLabel(qEm(o)) || '-'}   >   À : ${qDestLabel(o)}`, { size: 8, color: [70, 70, 70], indent: 19, gap: .6 });
       if (o.localisation) ctx.text(o.localisation, { size: 8.5, bold: true, color: [90, 55, 140], indent: 19, gap: .2 });
       ctx.text(o.texte || '(sans texte)', { size: 10, indent: 19, gap: .4 });
-      ctx.text(`De : ${entLabel(qEm(o)) || '-'}   >   À : ${qDestLabel(o)}`, { size: 8, color: [70, 70, 70], indent: 19, gap: .3 });
       ctx.text([OBS_ST[o.statut], o.statut === 'fait' && o.regleeAu ? 'au ' + crName(o.regleeAu) : '', o.echeance && o.statut !== 'fait' ? 'échéance : ' + fmtD(o.echeance) : '', o.cr && o.cr < v.numero ? 'posée au ' + crName(o.cr) : '', o.photosCR && !(o.photoIds || []).length ? 'photos au ' + crName(o.photosCR) : ''].filter(Boolean).join(' · '), { size: 8, color: col, indent: 19, gap: 1.4 });
       if ((o.photoIds || []).length) { await pdfPhotos(ctx, o.photoIds, nph, qNum(o)); nph += o.photoIds.length; ctx.y += 1; }
       doc.setDrawColor(232); doc.line(M + 19, ctx.y, W - M, ctx.y); ctx.y += 2.5;
