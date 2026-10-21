@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.4.6';
+const APP_VERSION = '0.5';
 /* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
@@ -276,9 +276,11 @@ function nextSeq(v) { const used = S.visites.flatMap(x => x.observations || []).
 const qDestDefault = lotId => lotEnt(lotId) ? [lotEnt(lotId)] : ['TOUS'];
 const qDest = o => (o.destinataires && o.destinataires.length) ? o.destinataires : qDestDefault(o.lotId);
 const qEm = o => entById(o.emetteurId) || emetteurOf();
+/* lot d'une question : celui de la première entreprise destinataire (sinon généralités) */
+const qLot = o => { for (const id of qDest(o)) { const e = entById(id); if (e && e.role === 'ENT') { const l = lotsOf().filter(x => x.entrepriseId === e.id).sort((a, b) => a.code.localeCompare(b.code))[0]; if (l) return l.id; } } return ''; };
 const entShort = e => { if (!e) return ''; const l = e.role === 'ENT' ? lotsOf().filter(x => x.entrepriseId === e.id).map(x => x.code).join(', ') : ''; return e.nom + (l ? ' (lot ' + l + ')' : ''); };
 const qDestLabel = o => qDest(o).map(id => id === 'TOUS' ? 'Tous' : entShort(entById(id))).filter(Boolean).join(', ');
-const obsFromPhoto = (v, p) => Object.assign(newObs(v, p.lotId, phTxt(p), [p.id], phLoc(p)), (p.destinataires || []).length ? { destinataires: [...p.destinataires], destAuto: false } : {}, p.emetteurId ? { emetteurId: p.emetteurId } : {});
+const obsFromPhoto = (v, p) => Object.assign(newObs(v, p.lotId, phTxt(p), [p.id]), (p.destinataires || []).length ? { destinataires: [...p.destinataires], destAuto: false } : {}, p.emetteurId ? { emetteurId: p.emetteurId } : {});
 function newObs(v, lotId = '', texte = '', photoIds = [], localisation = '') { return { id: DB.uid(), qid: DB.uid(), cr: v.numero, seq: nextSeq(v), lotId, localisation, texte, emetteurId: (emetteurOf() || {}).id || '', destinataires: qDestDefault(lotId), destAuto: true, statut: 'afaire', echeance: '', photoIds, origine: null }; }
 const carry = (o, from) => ({ ...o, id: DB.uid(), origine: o.cr || o.origine || from.numero, photoIds: [], photosCR: o.photoIds && o.photoIds.length ? (o.photosCR || from.numero) : o.photosCR || null });
 /* numérote les questions des CR créés avant la 0.4 (une question reprise garde le numéro de sa première apparition) */
@@ -315,9 +317,10 @@ function tabVisites(m) {
 async function viewVisite(app, id) {
   const v = S.visites.find(x => x.id === id); if (!v) { location.hash = `#/c/${S.ch.id}/visites`; return; }
   if (await injectPrev(v)) toast('Questions non réglées du compte-rendu précédent reprises en questions en cours');
+  { let ch = false; for (const o of v.observations || []) { const ph = (o.photoIds || []).map(photoById).filter(Boolean); if (o.localisation && ph.length) { for (const p of ph) if (!p.localisation) { p.localisation = o.localisation; await save('photos', p); } o.localisation = ''; ch = true; } } if (ch) await save('visites', v); } // la localisation va aux photos
   const ents = crEnts(v), lotKey = k => lotById(k) ? lotById(k).code : '~';
-  const sect = s => { const qs = v.observations.filter(o => qSect(v, o) === s).sort((a, b) => lotKey(a.lotId).localeCompare(lotKey(b.lotId)) || (a.cr - b.cr) || (a.seq - b.seq)); let h = '', last = null;
-    for (const o of qs) { if (o.lotId !== last) { last = o.lotId; const l = lotById(o.lotId); h += `<div class="lothead"><span class="code">${esc(l ? l.code : '—')}</span>${esc(l ? l.nom : 'Généralités')}${l && entById(l.entrepriseId) ? `<span class="muted small">· ${esc(entById(l.entrepriseId).nom)}</span>` : ''}</div>`; } h += obsHTML(o, v); }
+  const sect = s => { const qs = v.observations.filter(o => qSect(v, o) === s).sort((a, b) => lotKey(qLot(a)).localeCompare(lotKey(qLot(b))) || (a.cr - b.cr) || (a.seq - b.seq)); let h = '', last = null;
+    for (const o of qs) { if (qLot(o) !== last) { last = qLot(o); const l = lotById(last); h += `<div class="lothead"><span class="code">${esc(l ? l.code : '—')}</span>${esc(l ? l.nom : 'Généralités')}${l && entById(l.entrepriseId) ? `<span class="muted small">· ${esc(entById(l.entrepriseId).nom)}</span>` : ''}</div>`; } h += obsHTML(o, v); }
     return [qs.length, h]; };
   const used = new Set(v.observations.flatMap(o => o.photoIds || [])), dayPh = S.photos.filter(p => dayOf(p.date) === v.date && !used.has(p.id));
   const presRow = e => `<tr><td><b>${esc(e.nom || '(sans nom)')}</b><div class="small muted">${esc([e.role === 'ENT' ? lotsOf().filter(l => l.entrepriseId === e.id).map(l => 'lot ' + l.code).join(', ') : '', e.contact ? e.contact + (e.fonction ? ' (' + e.fonction + ')' : '') : ''].filter(Boolean).join(' · '))}</div></td>
@@ -339,7 +342,7 @@ async function viewVisite(app, id) {
     <div class="bar" style="margin-top:16px"><button class="btn danger" id="bDelV">Supprimer ce compte-rendu</button></div></main>
     <button class="fab" id="fab" aria-label="Photo pour ce compte-rendu">${ICON.cam}</button>`;
   bindTop(app);
-  await Promise.all(v.observations.map(async o => { const el = $(`[data-o="${o.id}"] .thumbs`, app); if (el && (o.photoIds || []).length) { el.innerHTML = await thumbsHTML(o.photoIds.map(photoById).filter(Boolean)); el.querySelectorAll('[data-ph]').forEach(b => b.onclick = () => photoSheet(photoById(b.dataset.ph))); } }));
+  await Promise.all(v.observations.map(async o => { const el = $(`[data-o="${o.id}"] .phcards`, app); if (el && (o.photoIds || []).length) { el.innerHTML = await phCardsHTML(o.photoIds.map(photoById).filter(Boolean)); bindPhCards(el); } }));
   let tm; const persist = () => { clearTimeout(tm); tm = setTimeout(() => save('visites', v), 400); };
   $$('[data-k]', app).forEach(i => i.oninput = () => { v[i.dataset.k] = i.value; persist(); });
   $$('.pres', app).forEach(g => g.onclick = e => { const b = e.target.closest('button'); if (!b) return; v.presents = v.presents || {}; const cur = presOf(v, g.dataset.e); v.presents[g.dataset.e] = cur === b.dataset.v ? '' : b.dataset.v; g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === v.presents[g.dataset.e])); persist(); });
@@ -351,14 +354,14 @@ async function viewVisite(app, id) {
       if (i.dataset.ok === 'emetteurId') { o.destinataires = qDest(o).filter(x => x !== o.emetteurId); save('visites', v).then(render); return; } persist(); });
     el.querySelectorAll('[data-qd]').forEach(b => b.onclick = () => { const id = b.dataset.qd; let d = [...qDest(o)];
       d = id === 'TOUS' ? ['TOUS'] : d.includes(id) ? d.filter(x => x !== id) : [...d.filter(x => x !== 'TOUS'), id];
-      o.destinataires = d.length ? d : ['TOUS']; o.destAuto = false; el.querySelectorAll('[data-qd]').forEach(x => x.classList.toggle('on', o.destinataires.includes(x.dataset.qd))); persist(); });
+      o.destinataires = d.length ? d : ['TOUS']; o.destAuto = false; o.lotId = qLot(o); el.querySelectorAll('[data-qd]').forEach(x => x.classList.toggle('on', o.destinataires.includes(x.dataset.qd))); persist(); });
     el.querySelector('[data-act=ph]').onclick = async () => { const ids = await pickPhotos(o.photoIds || [], v.date); if (ids) { o.photoIds = ids; await save('visites', v); render(); } };
-    el.querySelector('[data-act=cam]').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, lotId: o.lotId, texte: o.texte, localisation: o.localisation, silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; if (!o.localisation && phLoc(p)) o.localisation = phLoc(p); await save('visites', v); render(); }; inp.click(); };
+    el.querySelector('[data-act=cam]').onclick = () => { const inp = $('#camIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; const [p] = await processFiles([...inp.files], { forObs: true, lotId: qLot(o), texte: o.titre || o.texte, destinataires: qDest(o).includes('TOUS') ? undefined : qDest(o), silent: true }); o.photoIds = [...(o.photoIds || []), p.id]; await save('visites', v); render(); }; inp.click(); };
     const mv = el.querySelector('[data-act=done]') || el.querySelector('[data-act=open]'); mv.onclick = async () => { if (o.statut === 'fait') { o.statut = 'afaire'; delete o.regleeAu; } else { o.statut = 'fait'; o.regleeAu = v.numero; } await save('visites', v); render(); };
     el.querySelector('[data-act=del]').onclick = async () => { if (!confirm(`Supprimer la question ${qNum(o)} de ce compte-rendu ?`)) return; v.observations = v.observations.filter(x => x !== o); if (o.cr < v.numero) v.retires = [...(v.retires || []), o.qid || qNum(o)]; await save('visites', v); render(); };
-    el.querySelector('[data-act=res]').onclick = async () => { const r = await newReserve({ lotId: o.lotId, description: o.texte, localisation: o.localisation || '', photoIds: [...(o.photoIds || [])] }); const p = photoById((o.photoIds || [])[0]); if (p && p.planId) Object.assign(r, { planId: p.planId, x: p.x, y: p.y }); await save('reserves', r); toast(`Réserve n° ${r.numero} créée`); };
+    el.querySelector('[data-act=res]').onclick = async () => { const p = photoById((o.photoIds || [])[0]), r = await newReserve({ lotId: qLot(o), description: [o.titre, o.texte].filter(Boolean).join(' : '), localisation: (p && p.localisation) || o.localisation || '', photoIds: [...(o.photoIds || [])] }); if (p && p.planId) Object.assign(r, { planId: p.planId, x: p.x, y: p.y }); await save('reserves', r); toast(`Réserve n° ${r.numero} créée`); };
   });
-  $('#bObs').onclick = async () => { const lotId = await pickLot(); if (lotId === null) return; v.observations.push(newObs(v, lotId)); await save('visites', v); await render(); const last = $$('.qsect')[0] && $$('[data-o] textarea', $$('.qsect')[0]).pop(); if (last) { last.focus(); last.scrollIntoView({ block: 'center' }); } };
+  $('#bObs').onclick = async () => { const o = newObs(v, ''); v.observations.push(o); await save('visites', v); await render(); const t = $(`[data-o="${o.id}"] [data-ok=titre]`, app); if (t) { t.focus(); t.scrollIntoView({ block: 'center' }); } };
   $('#bPrev').onclick = async () => { const prev = prevVisite(v); if (!prev) return toast('Pas de compte-rendu précédent');
     const have = new Set(v.observations.map(o => o.qid || qNum(o))), add = (prev.observations || []).filter(o => o.statut !== 'fait' && !have.has(o.qid || qNum(o))).map(o => carry(o, prev));
     if (!add.length) return toast('Aucune question en cours à reprendre'); v.observations.push(...add); await save('visites', v); toast(`${add.length} question(s) reprise(s) du ${crName(prev.numero)}`); render(); };
@@ -368,14 +371,30 @@ async function viewVisite(app, id) {
   $('#bDelV').onclick = async () => { if (!confirm(`Supprimer le compte-rendu ${crName(v.numero)} ?`)) return; v.deleted = true; await save('visites', v); location.hash = `#/c/${S.ch.id}/visites`; };
 }
 function obsHTML(o, v) {
-  const hist = [o.cr && o.cr < v.numero ? `posée au ${crName(o.cr)}` : '', o.photosCR && !(o.photoIds || []).length ? `photos au ${crName(o.photosCR)}` : ''].filter(Boolean).join(' · ');
-  return `<div class="obs st-${o.statut}" data-o="${o.id}">    <div class="qwho"><label class="row small muted" style="gap:6px">De<select data-ok="emetteurId" style="width:auto;max-width:260px">${intervenants().map(e => `<option value="${e.id}"${qEm(o) && qEm(o).id === e.id ? ' selected' : ''}>${esc(entLabel(e))}</option>`).join('')}</select></label>
-      <span class="small muted">À</span><div class="levels wrap">${[['TOUS', 'Tous'], ...intervenants().filter(e => !qEm(o) || e.id !== qEm(o).id).map(e => [e.id, entShort(e)])].map(([id, t]) => `<button type="button" class="chip${qDest(o).includes(id) ? ' on' : ''}" data-qd="${id}">${esc(t)}</button>`).join('')}</div></div><div class="row" style="gap:8px"><span class="qnum">${esc(qNum(o))}</span><input type="text" data-ok="localisation" list="dlLoc" value="${esc(o.localisation || '')}" placeholder="Localisation (pièce, niveau)" autocomplete="off" class="grow"></div><textarea data-ok="texte" rows="2" placeholder="Question, constat, demande">${esc(o.texte)}</textarea>
-    <div class="row" style="flex-wrap:wrap"><select data-ok="statut" style="width:auto">${Object.entries(OBS_ST).map(([k, t]) => `<option value="${k}"${o.statut === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-    <label class="row small muted" style="gap:4px">Échéance <input type="date" data-ok="echeance" value="${o.echeance || ''}" style="width:auto"></label>
-    <select data-ok="lotId" style="width:auto;max-width:200px">${lotOptions(o.lotId)}</select>${hist ? `<span class="small muted">${hist}</span>` : ''}</div>
-    <div class="thumbs" style="grid-template-columns:repeat(auto-fill,minmax(74px,1fr))"></div>
-    <div class="row" style="flex-wrap:wrap"><button class="btn sm" data-act="cam">Photo</button><button class="btn sm" data-act="ph">Joindre des photos</button><button class="btn sm" data-act="res">En faire une réserve</button><span class="grow"></span>${o.statut === 'fait' ? '<button class="btn sm" data-act="open">Remettre en cours</button>' : '<button class="btn sm pri" data-act="done">✓ Réglée</button>'}<button class="btn sm danger" data-act="del">Supprimer</button></div></div>`;
+  const hist = [o.cr && o.cr < v.numero ? `posée au ${crName(o.cr)}` : '', o.statut === 'fait' && o.regleeAu ? `réglée au ${crName(o.regleeAu)}` : '', o.photosCR && !(o.photoIds || []).length ? `photos au ${crName(o.photosCR)}` : ''].filter(Boolean).join(' · ');
+  return `<div class="obs st-${o.statut}" data-o="${o.id}">
+    <div class="qwho"><label class="row small muted" style="gap:6px">De<select data-ok="emetteurId" style="width:auto;max-width:260px">${intervenants().map(e => `<option value="${e.id}"${qEm(o) && qEm(o).id === e.id ? ' selected' : ''}>${esc(entLabel(e))}</option>`).join('')}</select></label>
+      <span class="small muted">À</span><div class="levels wrap">${[['TOUS', 'Tous'], ...intervenants().filter(e => !qEm(o) || e.id !== qEm(o).id).map(e => [e.id, entShort(e)])].map(([id, t]) => `<button type="button" class="chip${qDest(o).includes(id) ? ' on' : ''}" data-qd="${id}">${esc(t)}</button>`).join('')}</div>
+      ${o.statut === 'fait' ? '' : `<label class="row small muted" style="gap:4px;margin-left:auto">Échéance <input type="date" data-ok="echeance" value="${o.echeance || ''}" style="width:auto"></label>`}</div>
+    <div class="row" style="gap:8px"><span class="qnum">${esc(qNum(o))}</span><input type="text" data-ok="titre" value="${esc(o.titre || '')}" placeholder="Titre (ex. : Peintures à revoir)" class="grow qtitle"></div>
+    <textarea data-ok="texte" rows="2" placeholder="Question, constat, demande">${esc(o.texte)}</textarea>
+    ${o.localisation && !(o.photoIds || []).length ? `<div class="small muted">Localisation : ${esc(o.localisation)}</div>` : ''}
+    <div class="phcards"></div>
+    <div class="row" style="flex-wrap:wrap"><button class="btn sm" data-act="cam">Photo</button><button class="btn sm" data-act="ph">Joindre des photos</button><button class="btn sm" data-act="res">En faire une réserve</button>${hist ? `<span class="small muted">${hist}</span>` : ''}<span class="grow"></span>${o.statut === 'fait' ? '<button class="btn sm" data-act="open">Remettre en cours</button>' : '<button class="btn sm pri" data-act="done">✓ Réglée</button>'}<button class="btn sm danger" data-act="del">Supprimer</button></div></div>`;
+}
+/* photo jointe à une question : vignette, petit plan de localisation, légende = localisation (pièce, niveau) */
+const miniCache = new Map();
+async function miniPlan(p) { const pl = planById(p.planId); if (!pl || p.x == null) return ''; const k = [p.id, p.planId, p.x, p.y, p.dir].join('|'); if (!miniCache.has(k)) miniCache.set(k, await planMini(pl, p, 240, 240)); return miniCache.get(k); }
+async function phCardsHTML(list) {
+  const out = await Promise.all(list.map(async p => { const [u, m] = await Promise.all([BlobURL(p.thumbId || p.blobId), miniPlan(p)]);
+    return `<div class="phc" data-pc="${p.id}"><div class="row" style="gap:6px;align-items:stretch"><button type="button" class="phc-img" data-ph="${p.id}"><img src="${u}" alt=""></button>${m ? `<button type="button" class="phc-plan" data-pl="${p.id}" title="${esc((planById(p.planId) || {}).nom || '')}"><img src="${m}" alt="Plan de localisation"></button>` : `<button type="button" class="phc-plan none" data-pl="${p.id}">Placer sur le plan</button>`}</div>
+      <input type="text" data-ploc="${p.id}" list="dlLoc" value="${esc(p.localisation || '')}" placeholder="Localisation : chambre 3, R+2" autocomplete="off"><div class="small muted">${esc((planById(p.planId) || {}).nom ? 'Niveau ' + planById(p.planId).nom : '')}</div></div>`; }));
+  return out.join('');
+}
+function bindPhCards(el) {
+  el.querySelectorAll('[data-ph]').forEach(b => b.onclick = () => photoSheet(photoById(b.dataset.ph)));
+  el.querySelectorAll('[data-pl]').forEach(b => b.onclick = async () => { const p = photoById(b.dataset.pl); if (!S.plans.length) return toast('Importez d\'abord les plans de niveaux (onglet Plans)'); await locateSheet(p, { forObs: true, silent: true }); render(); });
+  el.querySelectorAll('[data-ploc]').forEach(i => i.onchange = async () => { const p = photoById(i.dataset.ploc); p.localisation = i.value.trim(); await save('photos', p); });
 }
 function pickLot(title = 'Lot concerné') {
   return new Promise(res => { const sh = sheet(title, `<div class="list">${[{ id: '', code: '—', nom: 'Sans lot / généralités' }, ...lotsOf().slice().sort((a, b) => a.code.localeCompare(b.code))].map(l => `<button class="card ch" style="text-align:left;cursor:pointer" data-lot="${l.id}"><span class="ico" style="width:36px;height:36px;font-size:13px">${esc(l.code)}</span><span class="grow"><b>${esc(l.nom)}</b>${l.entrepriseId && entById(l.entrepriseId) ? `<div class="small muted">${esc(entById(l.entrepriseId).nom)}</div>` : ''}</span></button>`).join('')}</div>`);

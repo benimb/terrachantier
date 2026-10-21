@@ -90,3 +90,14 @@ async function planExtract(plan, pts, W = 900, H = 560, zoomPx = 1400) {
   c.strokeStyle = '#999'; c.lineWidth = 1; c.strokeRect(.5, .5, W - 1, H - 1);
   return cv.toDataURL('image/jpeg', .85);
 }
+/* petit plan de localisation : le niveau entier, réduit, avec le repère et la direction de prise de vue */
+async function planMini(plan, pt, W = 360, H = 360, color = '#c2410c') {
+  const im = new Image(); im.src = await BlobURL(plan.blobId); await im.decode();
+  const k = Math.min(W / plan.w, H / plan.h), dw = plan.w * k, dh = plan.h * k, ox = (W - dw) / 2, oy = (H - dh) / 2;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.drawImage(im, ox, oy, dw, dh);
+  const x = ox + pt.x * dw, y = oy + pt.y * dh;
+  if (pt.dir != null) { const a = (pt.dir - 90) * Math.PI / 180; c.fillStyle = color + '55'; c.beginPath(); c.moveTo(x, y); c.arc(x, y, W * .16, a - .45, a + .45); c.closePath(); c.fill(); }
+  c.fillStyle = color; c.beginPath(); c.arc(x, y, Math.max(6, W * .028), 0, 7); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke();
+  c.strokeStyle = '#999'; c.lineWidth = 1; c.strokeRect(.5, .5, W - 1, H - 1);
+  return cv.toDataURL('image/jpeg', .85);
+}

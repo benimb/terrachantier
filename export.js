@@ -24,19 +24,22 @@ async function pdfHeader(ctx, big, lines) {
   for (const l of lines.filter(Boolean)) ctx.text(l, { size: 9.5, gap: .3 }); ctx.y += 2; ctx.rule();
 }
 /* photos d'un bloc : trois par ligne, légende dessous ; extrait de plan quand elles sont localisées */
-async function pdfPhotos(ctx, ids, numStart = 1, ref = '') {
+/* photos d'une question : deux par ligne, chacune avec son petit plan de localisation ; légende = localisation */
+async function pdfPhotos(ctx, ids, numStart = 1, ref = '', indent = 0) {
   const ph = ids.map(photoById).filter(Boolean); if (!ph.length) return;
-  const { doc, M, W } = ctx, gap = 3, cw = (W - 2 * M - 2 * gap) / 3;
-  for (let i = 0; i < ph.length; i += 3) {
-    const row = ph.slice(i, i + 3), ims = await Promise.all(row.map(p => imgData(p.blobId))), hs = ims.map(im => im ? Math.min(cw * im.h / im.w, cw * 1.05) : 0);
-    doc.setFontSize(7.5); const caps = row.map((p, k) => doc.splitTextToSize(pdfTxt(`Ph. ${numStart + i + k}${ref ? ' (' + ref + ')' : ''} - ${[phLoc(p), phTxt(p)].filter(Boolean).join(' : ') || fmtD(p.date)}`), cw).slice(0, 3));
-    const rh2 = Math.max(...hs) + 2.5 + 3.1 * Math.max(...caps.map(c => c.length)); ctx.need(rh2 + 2);
-    row.forEach((p, k) => { const im = ims[k]; if (!im) return; const w = Math.min(cw, hs[k] * im.w / im.h), x = M + k * (cw + gap) + (cw - w) / 2; doc.addImage(im.url, 'JPEG', x, ctx.y, w, hs[k]);
-      doc.setFontSize(7.5); doc.setTextColor(90); doc.setFont('helvetica', 'normal'); caps[k].forEach((l, j) => doc.text(l, M + k * (cw + gap), ctx.y + hs[k] + 3.4 + j * 3.1)); });
-    ctx.y += rh2;
+  const { doc, M, W } = ctx, x0 = M + indent, gap = 4, cw = (W - M - x0 - gap) / 2, pw = cw * .63, mw = cw - pw - 2;
+  for (let i = 0; i < ph.length; i += 2) {
+    const row = ph.slice(i, i + 2), ims = await Promise.all(row.map(p => imgData(p.blobId, 900)));
+    const minis = await Promise.all(row.map(p => { const pl = planById(p.planId); return pl && p.x != null ? planMini(pl, p, 300, 300) : null; }));
+    const hs = ims.map(im => im ? Math.min(pw * im.h / im.w, pw * .9) : 0), bh = Math.max(...hs, ...minis.map(m => m ? mw : 0));
+    doc.setFontSize(7.5); const caps = row.map((p, k) => doc.splitTextToSize(pdfTxt(`Ph. ${numStart + i + k}${ref ? ' (' + ref + ')' : ''} - ${phLoc(p) || 'localisation à préciser'}`), cw).slice(0, 2));
+    const rh = bh + 2.5 + 3.1 * Math.max(...caps.map(c => c.length)); ctx.need(rh + 2);
+    row.forEach((p, k) => { const x = x0 + k * (cw + gap), im = ims[k];
+      if (im) { const w = Math.min(pw, hs[k] * im.w / im.h); doc.addImage(im.url, 'JPEG', x, ctx.y, w, hs[k]); }
+      if (minis[k]) doc.addImage(minis[k], 'JPEG', x + pw + 2, ctx.y, mw, mw);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(70); caps[k].forEach((l, j) => doc.text(l, x, ctx.y + bh + 3.2 + j * 3.1)); });
+    ctx.y += rh;
   }
-  const byPlan = new Map(); ph.forEach((p, k) => { if (p.planId && planById(p.planId)) { if (!byPlan.has(p.planId)) byPlan.set(p.planId, []); byPlan.get(p.planId).push({ x: p.x, y: p.y, dir: p.dir, label: numStart + k, color: '#2f6fb5' }); } });
-  for (const [pid, pts] of byPlan) { const pl = planById(pid), u = await planExtract(pl, pts, 900, 420), h = (W - 2 * M) * 420 / 900 * .62; ctx.need(h + 6); doc.addImage(u, 'JPEG', M, ctx.y, (W - 2 * M) * .62, h); doc.setFontSize(7.5); doc.setTextColor(90); doc.text(pdfTxt('Localisation : ' + pl.nom), M + (W - 2 * M) * .62 + 3, ctx.y + 4); ctx.y += h + 3; }
 }
 async function exportCR(v) {
   toast('Préparation du PDF…'); const ctx = pdfDoc(`${crName(v.numero)} du ${fmtD(v.date)}`), { doc, M, W } = ctx;
@@ -65,20 +68,22 @@ async function exportCR(v) {
   doc.addPage(); ctx.y = M + 4;
   const lotKey = k => lotById(k) ? lotById(k).code : '~'; let nph = 1;
   for (const [sk, st] of Q_SECT) {
-    const list = qs.filter(o => qSect(v, o) === sk).sort((a, b) => lotKey(a.lotId).localeCompare(lotKey(b.lotId)) || (a.cr - b.cr) || (a.seq - b.seq));
+    const list = qs.filter(o => qSect(v, o) === sk).sort((a, b) => lotKey(qLot(a)).localeCompare(lotKey(qLot(b))) || (a.cr - b.cr) || (a.seq - b.seq));
     ctx.need(22); doc.setFillColor(122, 79, 176); doc.rect(M, ctx.y, W - 2 * M, 8, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255); doc.text(pdfTxt(`${st} (${list.length})`), M + 2.5, ctx.y + 5.5); ctx.y += 11;
     if (!list.length) { ctx.text(sk === 'jour' ? 'Aucune question posée à cette réunion.' : sk === 'encours' ? 'Aucune question en cours.' : 'Aucune question réglée à cette réunion.', { size: 9, color: [120, 120, 120], gap: 3 }); continue; }
     let last = null;
     for (const o of list) {
-      if (o.lotId !== last) { last = o.lotId; const l = lotById(o.lotId), ent = l && entById(l.entrepriseId); ctx.need(18); doc.setFillColor(240, 235, 247); doc.rect(M, ctx.y, W - 2 * M, 6.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(90, 55, 140);
+      if (qLot(o) !== last) { last = qLot(o); const l = lotById(last), ent = l && entById(l.entrepriseId); ctx.need(18); doc.setFillColor(240, 235, 247); doc.rect(M, ctx.y, W - 2 * M, 6.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(90, 55, 140);
         doc.text(pdfTxt(l ? `Lot ${l.code} - ${l.nom}` : 'Généralités'), M + 2, ctx.y + 4.5); if (ent) { doc.setFont('helvetica', 'normal'); doc.setTextColor(100); doc.text(pdfTxt(ent.nom), W - M - 2, ctx.y + 4.5, { align: 'right' }); } ctx.y += 8.5; }
-      const col = o.statut === 'fait' ? [47, 143, 91] : o.statut === 'info' ? [47, 111, 181] : [194, 65, 12];
-      ctx.need(12); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...col); doc.text(qNum(o), M, ctx.y + 3);
-      ctx.text(`De : ${entLabel(qEm(o)) || '-'}   >   À : ${qDestLabel(o)}`, { size: 8, color: [70, 70, 70], indent: 19, gap: .6 });
-      if (o.localisation) ctx.text(o.localisation, { size: 8.5, bold: true, color: [90, 55, 140], indent: 19, gap: .2 });
-      ctx.text(o.texte || '(sans texte)', { size: 10, indent: 19, gap: .4 });
-      ctx.text([OBS_ST[o.statut], o.statut === 'fait' && o.regleeAu ? 'au ' + crName(o.regleeAu) : '', o.echeance && o.statut !== 'fait' ? 'échéance : ' + fmtD(o.echeance) : '', o.cr && o.cr < v.numero ? 'posée au ' + crName(o.cr) : '', o.photosCR && !(o.photoIds || []).length ? 'photos au ' + crName(o.photosCR) : ''].filter(Boolean).join(' · '), { size: 8, color: col, indent: 19, gap: 1.4 });
-      if ((o.photoIds || []).length) { await pdfPhotos(ctx, o.photoIds, nph, qNum(o)); nph += o.photoIds.length; ctx.y += 1; }
+      const col = o.statut === 'fait' ? [47, 143, 91] : [194, 65, 12];
+      ctx.need(14); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...col); doc.text(qNum(o), M, ctx.y + 3.6);
+      ctx.text(o.titre || '(sans titre)', { size: 10.5, bold: true, indent: 19, gap: .5 });
+      ctx.text(`De : ${entLabel(qEm(o)) || '-'}   >   À : ${qDestLabel(o)}${o.echeance && o.statut !== 'fait' ? '   ·   échéance : ' + fmtD(o.echeance) : ''}`, { size: 8, color: [70, 70, 70], indent: 19, gap: .6 });
+      if (o.localisation && !(o.photoIds || []).length) ctx.text(o.localisation, { size: 8.5, color: [90, 55, 140], indent: 19, gap: .2 });
+      if (o.texte) ctx.text(o.texte, { size: 10, indent: 19, gap: .4 });
+      const hist = [o.statut === 'fait' && o.regleeAu ? 'Réglée au ' + crName(o.regleeAu) : '', o.cr && o.cr < v.numero ? 'posée au ' + crName(o.cr) : '', o.photosCR && !(o.photoIds || []).length ? 'photos au ' + crName(o.photosCR) : ''].filter(Boolean).join(' · ');
+      if (hist) ctx.text(hist, { size: 8, color: col, indent: 19, gap: 1.4 }); else ctx.y += 1;
+      if ((o.photoIds || []).length) { await pdfPhotos(ctx, o.photoIds, nph, qNum(o), 19); nph += o.photoIds.length; ctx.y += 1; }
       doc.setDrawColor(232); doc.line(M + 19, ctx.y, W - M, ctx.y); ctx.y += 2.5;
     }
     ctx.y += 3;
