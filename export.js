@@ -39,9 +39,9 @@ async function pdfPhotos(ctx, ids, numStart = 1, ref = '') {
   for (const [pid, pts] of byPlan) { const pl = planById(pid), u = await planExtract(pl, pts, 900, 420), h = (W - 2 * M) * 420 / 900 * .62; ctx.need(h + 6); doc.addImage(u, 'JPEG', M, ctx.y, (W - 2 * M) * .62, h); doc.setFontSize(7.5); doc.setTextColor(90); doc.text(pdfTxt('Localisation : ' + pl.nom), M + (W - 2 * M) * .62 + 3, ctx.y + 4); ctx.y += h + 3; }
 }
 async function exportCR(v) {
-  toast('Préparation du PDF…'); const ctx = pdfDoc(`CR n° ${v.numero} du ${fmtD(v.date)}`), { doc, M, W } = ctx;
+  toast('Préparation du PDF…'); const ctx = pdfDoc(`${crName(v.numero)} du ${fmtD(v.date)}`), { doc, M, W } = ctx;
   const em = emetteurOf(v);
-  await pdfHeader(ctx, `Compte-rendu de chantier n° ${v.numero}`, [`Visite du ${fmtDL(v.date)}${v.heure ? ' à ' + v.heure.replace(':', ' h ') : ''}${v.meteo ? ' · météo : ' + v.meteo : ''}`, em && 'Émetteur : ' + entLabel(em), v.redacteur && 'Rédigé par ' + v.redacteur]);
+  await pdfHeader(ctx, `Compte-rendu de chantier ${crName(v.numero)}`, [`Visite du ${fmtDL(v.date)}${v.heure ? ' à ' + v.heure.replace(':', ' h ') : ''}${v.meteo ? ' · météo : ' + v.meteo : ''}`, em && 'Émetteur : ' + entLabel(em), v.redacteur && 'Rédigé par ' + v.redacteur]);
   // première page : présences, convocations, prochaine réunion
   const ents = crEnts(v);
   if (ents.length) { ctx.text('Présences et convocations', { size: 11.5, bold: true, gap: 1 }); ctx.text('O présent · N absent · R en retard · E excusé', { size: 7.5, color: [120, 120, 120], gap: 1.5 });
@@ -76,14 +76,14 @@ async function exportCR(v) {
       ctx.need(12); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...col); doc.text(qNum(o), M, ctx.y + 3.6);
       if (o.localisation) ctx.text(o.localisation, { size: 8.5, bold: true, color: [90, 55, 140], indent: 19, gap: .2 });
       ctx.text(o.texte || '(sans texte)', { size: 10, indent: 19, gap: .4 });
-      ctx.text([OBS_ST[o.statut], o.statut === 'fait' && o.regleeAu ? 'au CR n° ' + o.regleeAu : '', o.echeance && o.statut !== 'fait' ? 'échéance : ' + fmtD(o.echeance) : '', o.cr && o.cr < v.numero ? 'posée au CR n° ' + o.cr : '', o.photosCR && !(o.photoIds || []).length ? 'photos au CR n° ' + o.photosCR : ''].filter(Boolean).join(' · '), { size: 8, color: col, indent: 19, gap: 1.4 });
+      ctx.text([OBS_ST[o.statut], o.statut === 'fait' && o.regleeAu ? 'au ' + crName(o.regleeAu) : '', o.echeance && o.statut !== 'fait' ? 'échéance : ' + fmtD(o.echeance) : '', o.cr && o.cr < v.numero ? 'posée au ' + crName(o.cr) : '', o.photosCR && !(o.photoIds || []).length ? 'photos au ' + crName(o.photosCR) : ''].filter(Boolean).join(' · '), { size: 8, color: col, indent: 19, gap: 1.4 });
       if ((o.photoIds || []).length) { await pdfPhotos(ctx, o.photoIds, nph, qNum(o)); nph += o.photoIds.length; ctx.y += 1; }
       doc.setDrawColor(232); doc.line(M + 19, ctx.y, W - M, ctx.y); ctx.y += 2.5;
     }
     ctx.y += 3;
   }
   ctx.rule(); const dest = intervenants().filter(e => e.convoque !== false).map(e => e.nom + (e.contact ? ' (' + e.contact + ')' : '')); if (dest.length || v.diffusion) ctx.text('Diffusion : ' + [dest.join(', '), v.diffusion].filter(Boolean).join(' ; '), { size: 9, color: [90, 90, 90] });
-  ctx.finish(`${S.ch.code || S.ch.nom} - CR ${pad2(v.numero)} du ${v.date}`);
+  ctx.finish(`${S.ch.code || S.ch.nom} - ${crName(v.numero)} du ${v.date}`);
   v.diffuseLe = v.diffuseLe || today(); await save('visites', v);
 }
 async function exportReserves(list, F = {}) {
