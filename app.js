@@ -1,5 +1,5 @@
 /* TerraChantier : comptes-rendus de chantier, OPR et photos localisées sur plan */
-const APP_VERSION = '0.5';
+const APP_VERSION = '0.5.1';
 /* outils communs ($, esc, dates, ICON, ROLES, sheet, toast…) : common.js ; carnet de contacts : carnet.js */
 const intervenants = () => ((S.ch && S.ch.entreprises) || []).map(e => (e.role ? e : Object.assign(e, { role: 'ENT' }))).slice().sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.nom || '').localeCompare(b.nom || ''));
 /* mode terrain (téléphone) : prise de vues, CR, réserves ; la préparation (chantiers, plans, intervenants, lots) se fait dans la version complète */
@@ -263,7 +263,7 @@ function pickPhotos(pre = [], day) {
 const pad2 = n => String(n || 0).padStart(2, '0');
 const crName = n => 'C' + pad2(n); // compte-rendu de chantier n° 1 = C01
 const qNum = o => o.cr ? `C${pad2(o.cr)}.${pad2(o.seq)}` : '';
-const Q_SECT = [['jour', 'Questions du jour'], ['encours', 'Questions en cours'], ['reglees', 'Questions réglées']];
+const Q_SECT = [['reglees', 'Questions réglées'], ['encours', 'Questions en cours'], ['jour', 'Questions du jour']];
 const qSect = (v, o) => o.statut === 'fait' ? 'reglees' : o.cr && o.cr < v.numero ? 'encours' : 'jour';
 const PRES = { O: 'Présent', N: 'Absent', R: 'En retard', E: 'Excusé' }, PRES_OLD = { P: 'O', A: 'N' };
 const presOf = (v, id) => { const x = (v.presents || {})[id] || ''; return PRES_OLD[x] || x; };
@@ -336,7 +336,7 @@ async function viewVisite(app, id) {
       <label class="f" style="margin-top:8px">Autres participants<textarea data-k="autres" rows="2" placeholder="MOA : Mme X ; BET structure : M. Y">${esc(v.autres)}</textarea></label></div>
     ${dayPh.length ? `<h3 style="margin:18px 0 6px;font-size:16px">Photos du ${fmtD(v.date)} non rattachées (${dayPh.length})</h3><div class="hint" style="margin-bottom:6px">Touchez une photo pour poser une question du jour à partir de son texte.</div><div class="thumbs" id="dayPh">${await thumbsHTML(dayPh)}</div>` : ''}
     <div class="bar" style="margin-top:18px"><h3 style="font-size:16px;flex:1 1 100%">Questions</h3><button class="btn" id="bPrev">Reprendre les questions en cours du CR précédent</button><button class="btn pri" id="bObs">+ Question du jour</button></div>
-    ${S3.map(([k, t, n, h]) => `<div class="qsect"><h4>${t} <span class="muted">${n}</span></h4>${h || `<div class="hint">${k === 'jour' ? 'Aucune question posée à cette réunion.' : k === 'encours' ? 'Aucune question en cours.' : 'Aucune question réglée à cette réunion.'}</div>`}</div>`).join('')}
+    ${S3.map(([k, t, n, h]) => `<div class="qsect" data-s="${k}"><h4>${t}</h4>${h || `<div class="hint">${k === 'jour' ? 'Aucune question posée à cette réunion.' : k === 'encours' ? 'Aucune question en cours.' : 'Aucune question réglée à cette réunion.'}</div>`}</div>`).join('')}
     <datalist id="dlLoc">${locList().map(l => `<option value="${esc(l)}">`).join('')}</datalist>
     <label class="f" style="margin-top:16px">Diffusion complémentaire (les intervenants convoqués sont destinataires d'office)<textarea data-k="diffusion" rows="2" placeholder="Autres destinataires">${esc(v.diffusion)}</textarea></label>
     <div class="bar" style="margin-top:16px"><button class="btn danger" id="bDelV">Supprimer ce compte-rendu</button></div></main>
@@ -554,12 +554,20 @@ async function settingsSheet() {
   const cfg = await Sync.config(), est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
   const sh = sheet('Réglages', `<label class="f">Votre nom sur cet appareil (rédacteur des comptes-rendus)<input type="text" id="sAut" value="${esc(S.auteur)}"></label>
     <label class="f">Affichage<select id="sMode"><option value="auto"${S.mode === 'auto' ? ' selected' : ''}>Automatique : mode terrain sur téléphone, version complète sur PC et tablette</option><option value="terrain"${S.mode === 'terrain' ? ' selected' : ''}>Mode terrain (photos, CR, réserves)</option><option value="complet"${S.mode === 'complet' ? ' selected' : ''}>Version complète (tout faire, y compris la préparation)</option></select></label>
+    <div class="card"><b>Votre agence</b><div class="hint" style="margin:4px 0 8px">Nom et logo en tête des comptes-rendus et des listes de réserves.</div>
+      <div class="row" style="flex-wrap:wrap;gap:10px"><img id="sLogo" alt="" style="max-height:52px;max-width:180px;display:none;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px"><span class="grow small" id="sAg">${Carnet.agence() ? esc(Carnet.agence().nom) : 'Agence non renseignée'}</span>
+      <button class="btn" id="sLogoB">${Carnet.agence() && Carnet.agence().logoId ? 'Changer le logo' : 'Ajouter le logo'}</button>${Carnet.agence() && Carnet.agence().logoId ? '<button class="btn danger" id="sLogoX">Retirer</button>' : ''}<a class="btn" href="contacts.html#/agence">Fiche de l'agence</a></div></div>
     <div class="card"><b>Synchronisation entre appareils</b><div class="hint" style="margin:4px 0 8px">Téléphone, tablette et PC partagent les mêmes chantiers, plans et photos.</div>${Sync.formHTML(cfg)}</div>
     <div class="card"><b>Sauvegarde</b><div class="hint" style="margin:4px 0 8px">Fichier de sauvegarde complet de cet appareil (chantiers, plans, photos).${est ? ` Espace utilisé : ${(est.usage / 1048576).toFixed(0)} Mo.` : ''}</div><div class="row" style="flex-wrap:wrap"><button class="btn" id="sExp">Enregistrer une sauvegarde</button><button class="btn" id="sImp">Restaurer une sauvegarde</button></div></div>
     <div class="small muted">TerraChantier ${APP_VERSION} bêta · TerraSuite${Carnet.agence() ? ' · ' + esc(Carnet.agence().nom) : ''} · <a href="contacts.html#/agence">Mon agence</a></div>`, `<button class="btn pri" data-close>Fermer</button>`);
   $('#sAut', sh.el).onchange = e => { S.auteur = e.target.value.trim(); DB.meta('auteur', S.auteur); };
   $('#sMode', sh.el).onchange = e => { S.mode = e.target.value; DB.meta('mode', S.mode); render(); };
   Sync.bindForm(sh.el);
+  const ag0 = Carnet.agence(); if (ag0 && ag0.logoId) BlobURL(ag0.logoId).then(u => { if (u) { $('#sLogo', sh.el).src = u; $('#sLogo', sh.el).style.display = 'block'; } });
+  $('#sLogoB', sh.el).onclick = () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return;
+    let ag = Carnet.agence(); if (!ag) { const nom = prompt("Nom de l'agence"); if (!nom) return; ag = { id: DB.uid(), agence: true, role: 'MOE', nom, adresse: '', cp: '', ville: '', tel: '', email: '', site: '', siret: '', ordre: '', notes: '', lots: [], personnes: [] }; }
+    const blob = f.size < 1.5e6 ? f : (await shrinkImage(f, 800, .92)).blob; ag.logoId = await DB.putBlob(blob); await Carnet.put(ag); toast('Logo enregistré'); sh.close(); settingsSheet(); }; inp.click(); };
+  if ($('#sLogoX', sh.el)) $('#sLogoX', sh.el).onclick = async () => { const ag = Carnet.agence(); ag.logoId = ''; await Carnet.put(ag); sh.close(); settingsSheet(); };
   $('#sExp', sh.el).onclick = () => backupExport();
   $('#sImp', sh.el).onclick = () => { const inp = $('#jsonIn'); inp.value = ''; inp.onchange = async () => { if (!inp.files[0]) return; try { const n = await backupImport(inp.files[0]); toast(`${n} fiche(s) restaurée(s)`); sh.close(); S._fresh = false; render(); } catch (e) { toast('Sauvegarde illisible : ' + e.message, 4000); } }; inp.click(); };
 }

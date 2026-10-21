@@ -63,13 +63,13 @@ async function exportCR(v) {
   if (v.autres) ctx.text('Autres participants : ' + v.autres, { size: 9.5, gap: 3 });
   if (v.prochaine) { ctx.rule(); ctx.text('Prochaine réunion : ' + v.prochaine, { size: 10.5, bold: true, gap: 1 }); const conv = ents.filter(e => convNext(v, e)).map(e => e.nom); if (conv.length) ctx.text('Convoqués : ' + conv.join(', '), { size: 9, color: [80, 80, 80], gap: 2 }); }
   const qs = v.observations || [], cnt = s => qs.filter(o => qSect(v, o) === s).length;
-  ctx.rule(); ctx.text(`Questions : ${cnt('jour')} du jour, ${cnt('encours')} en cours, ${cnt('reglees')} réglée(s) à cette réunion. Numérotation : C03.04 = 4e question posée au compte-rendu n° 3.`, { size: 8.5, color: [100, 100, 100] });
+  ctx.rule(); ctx.text('Numérotation des questions : C03.04 = 4e question posée au compte-rendu C03.', { size: 8.5, color: [100, 100, 100] });
   // questions : du jour, en cours, réglées ; par lot
   doc.addPage(); ctx.y = M + 4;
   const lotKey = k => lotById(k) ? lotById(k).code : '~'; let nph = 1;
   for (const [sk, st] of Q_SECT) {
     const list = qs.filter(o => qSect(v, o) === sk).sort((a, b) => lotKey(qLot(a)).localeCompare(lotKey(qLot(b))) || (a.cr - b.cr) || (a.seq - b.seq));
-    ctx.need(22); doc.setFillColor(122, 79, 176); doc.rect(M, ctx.y, W - 2 * M, 8, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255); doc.text(pdfTxt(`${st} (${list.length})`), M + 2.5, ctx.y + 5.5); ctx.y += 11;
+    ctx.need(22); doc.setFillColor(122, 79, 176); doc.rect(M, ctx.y, W - 2 * M, 8, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255); doc.text(pdfTxt(st), M + 2.5, ctx.y + 5.5); ctx.y += 11;
     if (!list.length) { ctx.text(sk === 'jour' ? 'Aucune question posée à cette réunion.' : sk === 'encours' ? 'Aucune question en cours.' : 'Aucune question réglée à cette réunion.', { size: 9, color: [120, 120, 120], gap: 3 }); continue; }
     let last = null;
     for (const o of list) {
